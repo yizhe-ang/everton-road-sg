@@ -22,96 +22,6 @@ import { Perf } from "r3f-perf";
 import * as THREE from "three";
 import { gsap } from "gsap";
 import { MathUtils } from "three";
-import getFullscreenTriangle from "../getFullscreenTriangle.js";
-
-const fragmentShader = /* glsl */ `
-varying vec2 vUv;
-
-uniform sampler2D textureA;
-uniform sampler2D textureB;
-uniform float uProgress;
-
-vec4 mod289(vec4 x)
-{
-  return x - floor(x * (1.0 / 289.0)) * 289.0;
-}
-
-vec4 permute(vec4 x)
-{
-  return mod289(((x*34.0)+1.0)*x);
-}
-
-vec4 taylorInvSqrt(vec4 r)
-{
-  return 1.79284291400159 - 0.85373472095314 * r;
-}
-
-vec2 fade(vec2 t) {
-  return t*t*t*(t*(t*6.0-15.0)+10.0);
-}
-
-// Classic Perlin noise
-float cnoise(vec2 P)
-{
-  vec4 Pi = floor(P.xyxy) + vec4(0.0, 0.0, 1.0, 1.0);
-  vec4 Pf = fract(P.xyxy) - vec4(0.0, 0.0, 1.0, 1.0);
-  Pi = mod289(Pi); // To avoid truncation effects in permutation
-  vec4 ix = Pi.xzxz;
-  vec4 iy = Pi.yyww;
-  vec4 fx = Pf.xzxz;
-  vec4 fy = Pf.yyww;
-
-  vec4 i = permute(permute(ix) + iy);
-
-  vec4 gx = fract(i * (1.0 / 41.0)) * 2.0 - 1.0 ;
-  vec4 gy = abs(gx) - 0.5 ;
-  vec4 tx = floor(gx + 0.5);
-  gx = gx - tx;
-
-  vec2 g00 = vec2(gx.x,gy.x);
-  vec2 g10 = vec2(gx.y,gy.y);
-  vec2 g01 = vec2(gx.z,gy.z);
-  vec2 g11 = vec2(gx.w,gy.w);
-
-  vec4 norm = taylorInvSqrt(vec4(dot(g00, g00), dot(g01, g01), dot(g10, g10), dot(g11, g11)));
-  g00 *= norm.x;
-  g01 *= norm.y;
-  g10 *= norm.z;
-  g11 *= norm.w;
-
-  float n00 = dot(g00, vec2(fx.x, fy.x));
-  float n10 = dot(g10, vec2(fx.y, fy.y));
-  float n01 = dot(g01, vec2(fx.z, fy.z));
-  float n11 = dot(g11, vec2(fx.w, fy.w));
-
-  vec2 fade_xy = fade(Pf.xy);
-  vec2 n_x = mix(vec2(n00, n01), vec2(n10, n11), fade_xy.x);
-  float n_xy = mix(n_x.x, n_x.y, fade_xy.y);
-  return 2.3 * n_xy;
-}
-
-void main() {
-  vec2 uv = vUv;
-
-    vec4 colorA = texture2D(textureA, uv);
-    vec4 colorB = texture2D(textureB, uv);
-
-    // clamp the value between 0 and 1 to make sure the colors don't get messed up
-    float noise = clamp(cnoise(vUv * 2.5) + uProgress * 2.0, 0.0, 1.0);
-
-    vec4 color = mix(colorA, colorB, noise);
-    gl_FragColor = color;
-}
-`;
-
-const vertexShader = /* glsl */ `
-varying vec2 vUv;
-
-void main() {
-    vUv = uv;
-    gl_Position = vec4(position, 1.0);
-}
-`;
 
 function disableMSAA(target) {
   // disable MSAA on render targets (in this case the transmission render target)
@@ -155,11 +65,14 @@ export const Experience = () => {
   // useHelper(spotLight3, THREE.SpotLightHelper)
 
   // SETUP FBOS
-  const renderTargetA = useFBO();
-  const renderTargetB = useFBO();
-  const scene = new THREE.Scene();
-  const screenCamera = useRef();
-  const screenMesh = useRef();
+  const renderedScene = new THREE.Scene();
+  // const renderedScene = useRef();
+
+  const renderTarget1 = useFBO();
+  const renderTarget2 = useFBO();
+  const renderMaterial = useRef();
+  const renderCamera = useRef();
+  // const screenCamera = useRef()
 
   // CONTROLS
   useControls("Camera", {
@@ -216,38 +129,33 @@ export const Experience = () => {
     envMapIntensity: { value: 0.25, min: 0, max: 12 },
   });
 
-  // const transitionControls = useControls("Transition", {
-  //   transitionSpeed: {
-  //     value: 2,
-  //     min: 0.3,
-  //     max: 10,
-  //   },
-  //   progressionTarget: {
-  //     value: 1,
-  //   },
-  //   transition: {
-  //     value: 0,
-  //     options: {
-  //       Horizontal: 0,
-  //       Vertical: 1,
-  //     },
-  //     onChange: (value) => {
-  //       renderMaterial.current.transition = value;
-  //     },
-  //   },
-  // });
-
-  const transitionControls = useControls({
-    progress: {
-      value: -1.0,
-      min: -1,
+  const transitionControls = useControls("Transition", {
+    transitionSpeed: {
+      value: 2,
+      min: 0.3,
+      max: 10,
+    },
+    progressionTarget: {
+      value: 0,
+      min: 0,
       max: 1,
     },
+    // transition: {
+    //   value: 0,
+    //   options: {
+    //     Horizontal: 0,
+    //     Vertical: 1,
+    //   },
+    //   onChange: (value) => {
+    //     renderMaterial.current.transition = value;
+    //   },
+    // },
   });
 
   // INIT
   useEffect(() => {
     // INIT CAMERA
+    cameraControls.current.camera = renderCamera.current;
     cameraControls.current.setLookAt(...cameraPositions.intro, false);
 
     // INIT SPLATS
@@ -296,7 +204,7 @@ export const Experience = () => {
   const cameraRotate = new THREE.Vector2();
   const cameraRotateTo = new THREE.Vector2();
 
-  useFrame(({ gl, pointer, camera }, delta) => {
+  useFrame(({ gl, pointer, camera, scene }, delta) => {
     // UPDATE SCROLL ANIMATIONS
     if (tl.current) {
       tl.current.progress(scrollData.offset);
@@ -309,104 +217,78 @@ export const Experience = () => {
     // cameraControls.current.rotate(cameraRotate.x, cameraRotate.y, false);
 
     // RENDER SWITCHEROO
-
+    // Setup first scene
     transmissionMesh.current.visible = true;
-
-    gl.setRenderTarget(renderTargetA);
-    gl.render(scene, camera);
-
-    transmissionMesh.current.visible = true;
-
-    gl.setRenderTarget(renderTargetB);
-    gl.render(scene, camera);
-
-    screenMesh.current.material.uniforms.textureA.value = renderTargetA.texture;
-    screenMesh.current.material.uniforms.textureB.value = renderTargetB.texture;
-    screenMesh.current.material.uniforms.uProgress.value =
-      transitionControls.progress;
-
-    gl.setRenderTarget(null);
 
     // Render onto first target
-    // gl.setRenderTarget(renderTarget);
-
-    // transmissionMesh.current.visible = true;
-
-    // // Transition animation
-    // renderMaterial.current.progression = MathUtils.lerp(
-    //   renderMaterial.current.progression,
-    //   transitionControls.progressionTarget,
-    //   delta * transitionControls.transitionSpeed
-    // );
-
+    gl.setRenderTarget(renderTarget1);
+    gl.render(renderedScene, renderCamera.current);
     // gl.render(scene, renderCamera.current);
+    // gl.render(scene, camera);
 
-    // // Render onto second target
-    // gl.setRenderTarget(renderTarget2);
+    // Setup second scene
+    transmissionMesh.current.visible = false;
 
-    // transmissionMesh.current.visible = false;
-
+    // Render onto second target
+    gl.setRenderTarget(renderTarget2);
+    gl.render(renderedScene, renderCamera.current);
     // gl.render(scene, renderCamera.current);
+    // gl.render(scene, camera);
 
+    // Perform screen render
     // renderedScene.current.visible = false;
 
-    // // Render back to scene
-    // gl.setRenderTarget(null);
-    // renderMaterial.current.map = renderTarget.texture;
+    gl.setRenderTarget(null);
+    renderMaterial.current.map = renderTarget1.texture;
+
+    // Transition animation
+    renderMaterial.current.progression = MathUtils.lerp(
+      renderMaterial.current.progression,
+      transitionControls.progressionTarget,
+      delta * transitionControls.transitionSpeed
+    );
   });
 
   return (
     <>
       <Perf position="top-left" />
 
+
+      {/* SCREEN */}
+      <mesh position-z={-5}>
+        <planeGeometry args={[viewport.width, viewport.height]} />
+        <transitionMaterial
+          ref={renderMaterial}
+          tex={renderTarget1.texture}
+          tex2={renderTarget2.texture}
+          toneMapped={false}
+        />
+      </mesh>
+
       {/* CONTROLS */}
       <CameraControls
         ref={cameraControls}
+        enablePan={false}
         // disable all mouse buttons
-        mouseButtons={{
-          left: 0,
-          middle: 0,
-          right: 0,
-          wheel: 0,
-        }}
-        // disable all touch gestures
-        touches={{
-          one: 0,
-          two: 0,
-          three: 0,
-        }}
+        // mouseButtons={{
+        //   left: 0,
+        //   middle: 0,
+        //   right: 0,
+        //   wheel: 0,
+        // }}
+        // // disable all touch gestures
+        // touches={{
+        //   one: 0,
+        //   two: 0,
+        //   three: 0,
+        // }}
       />
-
-      {/* SCREEN */}
-      <OrthographicCamera ref={screenCamera} args={[-1, 1, 1, -1, 0, 1]} />
-      <mesh
-        ref={screenMesh}
-        geometry={getFullscreenTriangle()}
-        frustumCulled={false}
-      >
-        <shaderMaterial
-          uniforms={{
-            textureA: {
-              value: null,
-            },
-            textureB: {
-              value: null,
-            },
-            uTime: {
-              value: 0.0,
-            },
-            uProgress: {
-              progress: 0.0,
-            },
-          }}
-          vertexShader={vertexShader}
-          fragmentShader={fragmentShader}
-        />
-      </mesh>
+      <PerspectiveCamera near={0.5} ref={renderCamera} />
 
       {/* SCENE */}
       {createPortal(
         <>
+          {/* <group ref={renderedScene}> */}
           {/* LIGHTING */}
           <ambientLight intensity={Math.PI / 4} />
           <spotLight
@@ -506,8 +388,9 @@ export const Experience = () => {
               <meshStandardMaterial color="grey" />
             </Text>
           </Billboard>
+          {/* </group> */}
         </>,
-        scene
+        renderedScene
       )}
     </>
   );

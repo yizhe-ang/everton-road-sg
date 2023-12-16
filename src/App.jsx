@@ -24,8 +24,10 @@ extend({
 
 function App() {
   return (
-    <Canvas gl={{ antialias: false }}
-      // camera={{ position: [0, 0, 5], fov: 30 }}
+    <Canvas
+      gl={{ antialias: false }}
+      // camera={{ near: 0.5 }}
+      camera={{ position: [0, 0, 5], fov: 30 }}
     >
       <ScrollControls pages={5}>
         {/* FIXME: Need fog? */}
