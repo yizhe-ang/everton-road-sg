@@ -44,7 +44,7 @@ const cameraPositions = {
 };
 
 export const Experience = () => {
-  const { viewport } = useThree();
+  const { viewport, scene } = useThree();
   const scrollData = useScroll();
 
   // REFS
@@ -65,14 +65,12 @@ export const Experience = () => {
   // useHelper(spotLight3, THREE.SpotLightHelper)
 
   // SETUP FBOS
-  const renderedScene = new THREE.Scene();
-  // const renderedScene = useRef();
-
+  const renderedScene = useRef();
+  const renderCamera = useRef();
   const renderTarget1 = useFBO();
   const renderTarget2 = useFBO();
   const renderMaterial = useRef();
-  const renderCamera = useRef();
-  // const screenCamera = useRef()
+  const screenMesh = useRef()
 
   // CONTROLS
   useControls("Camera", {
@@ -217,26 +215,26 @@ export const Experience = () => {
     // cameraControls.current.rotate(cameraRotate.x, cameraRotate.y, false);
 
     // RENDER SWITCHEROO
+    screenMesh.current.visible = false
+    renderedScene.current.visible = true;
+
     // Setup first scene
     transmissionMesh.current.visible = true;
 
     // Render onto first target
     gl.setRenderTarget(renderTarget1);
-    gl.render(renderedScene, renderCamera.current);
-    // gl.render(scene, renderCamera.current);
-    // gl.render(scene, camera);
+    gl.render(scene, renderCamera.current);
 
     // Setup second scene
     transmissionMesh.current.visible = false;
 
     // Render onto second target
     gl.setRenderTarget(renderTarget2);
-    gl.render(renderedScene, renderCamera.current);
-    // gl.render(scene, renderCamera.current);
-    // gl.render(scene, camera);
+    gl.render(scene, renderCamera.current);
 
     // Perform screen render
-    // renderedScene.current.visible = false;
+    screenMesh.current.visible = true
+    renderedScene.current.visible = false;
 
     gl.setRenderTarget(null);
     renderMaterial.current.map = renderTarget1.texture;
@@ -253,9 +251,8 @@ export const Experience = () => {
     <>
       <Perf position="top-left" />
 
-
       {/* SCREEN */}
-      <mesh position-z={-5}>
+      <mesh position-z={-5} ref={screenMesh}>
         <planeGeometry args={[viewport.width, viewport.height]} />
         <transitionMaterial
           ref={renderMaterial}
@@ -266,132 +263,132 @@ export const Experience = () => {
       </mesh>
 
       {/* CONTROLS */}
+      <PerspectiveCamera near={0.5} ref={renderCamera} />
       <CameraControls
         ref={cameraControls}
-        enablePan={false}
         // disable all mouse buttons
-        // mouseButtons={{
-        //   left: 0,
-        //   middle: 0,
-        //   right: 0,
-        //   wheel: 0,
-        // }}
-        // // disable all touch gestures
-        // touches={{
-        //   one: 0,
-        //   two: 0,
-        //   three: 0,
-        // }}
+        mouseButtons={{
+          left: 0,
+          middle: 0,
+          right: 0,
+          wheel: 0,
+        }}
+        // disable all touch gestures
+        touches={{
+          one: 0,
+          two: 0,
+          three: 0,
+        }}
       />
-      <PerspectiveCamera near={0.5} ref={renderCamera} />
 
       {/* SCENE */}
-      {createPortal(
-        <>
-          {/* <group ref={renderedScene}> */}
-          {/* LIGHTING */}
-          <ambientLight intensity={Math.PI / 4} />
-          <spotLight
-            ref={spotLight1}
-            position={[0, 40, 26]}
-            angle={0.5}
-            decay={0.7}
-            distance={48}
-            penumbra={1}
-            intensity={1750}
-          />
-          <spotLight
-            ref={spotLight2}
-            color="white"
-            position={[20, -40, 26]}
-            angle={0.5}
-            decay={1}
-            distance={53}
-            penumbra={1}
-            intensity={2000}
-          />
-          <spotLight
-            ref={spotLight3}
-            color="red"
-            position={[15, 0, 20]}
-            angle={0.1}
-            decay={1}
-            distance={35}
-            penumbra={-1}
-            intensity={100}
-          />
+      {/* {createPortal(
+        <> */}
+      <group ref={renderedScene}>
+        {/* LIGHTING */}
+        <ambientLight intensity={Math.PI / 4} />
+        <spotLight
+          ref={spotLight1}
+          position={[0, 40, 26]}
+          angle={0.5}
+          decay={0.7}
+          distance={48}
+          penumbra={1}
+          intensity={1750}
+        />
+        <spotLight
+          ref={spotLight2}
+          color="white"
+          position={[20, -40, 26]}
+          angle={0.5}
+          decay={1}
+          distance={53}
+          penumbra={1}
+          intensity={2000}
+        />
+        <spotLight
+          ref={spotLight3}
+          color="red"
+          position={[15, 0, 20]}
+          angle={0.1}
+          decay={1}
+          distance={35}
+          penumbra={-1}
+          intensity={100}
+        />
 
-          {/* TRANSMISSION MESH */}
-          {/* <Float> */}
-          {/* TODO: Use MeshPortalMaterial? */}
-          {/* FIXME: Can't do transition effects with transmission material? */}
-          {/* TODO: Can use a different model? Like a toy box */}
-          <RoundedBox
-            ref={transmissionMesh}
-            args={[1.15, 1, 1]}
-            radius={0.05}
-            scale={17}
-            position-y={5}
+        {/* TRANSMISSION MESH */}
+        {/* <Float> */}
+        {/* TODO: Use MeshPortalMaterial? */}
+        {/* FIXME: Can't do transition effects with transmission material? */}
+        {/* TODO: Can use a different model? Like a toy box */}
+        <RoundedBox
+          ref={transmissionMesh}
+          args={[1.15, 1, 1]}
+          radius={0.05}
+          scale={17}
+          position-y={5}
+        >
+          {/* <meshStandardMaterial /> */}
+          <MeshTransmissionMaterial
+            backsideResolution={128}
+            backsideThickness={-0.25}
+            backsideRoughness={0.3}
+            clearcoatRoughness={0.1}
+            {...transmissionControls}
+            {...envControls}
+          />
+        </RoundedBox>
+
+        {/* </Float> */}
+        <ContactShadows
+          frames={1}
+          position={[0, -10, 0]}
+          scale={50}
+          far={40}
+          {...shadowsControls}
+        />
+
+        {/* ENVIRONMENT */}
+        {/* <Sky {...skyControls} /> */}
+        <Environment
+          files="./environmentMaps/the_sky_is_on_fire_2k.hdr"
+          // preset="sunset"
+          background
+          // ground={{
+          //   height: 7,
+          //   radius: 28,
+          //   scale: 100
+          // }}
+          blur={1}
+        ></Environment>
+
+        {/* TEXT */}
+        {/* TODO: Explore some cool typography effects */}
+        <Billboard position-y={20}>
+          <Text
+            fontSize={5}
+            anchorY="bottom"
+            textAlign="center"
+            font="fonts/Gloock-Regular.ttf"
           >
-            <MeshTransmissionMaterial
-              backsideResolution={128}
-              backsideThickness={-0.25}
-              backsideRoughness={0.3}
-              clearcoatRoughness={0.1}
-              {...transmissionControls}
-              {...envControls}
-            />
-          </RoundedBox>
-
-          {/* </Float> */}
-          <ContactShadows
-            frames={1}
-            position={[0, -10, 0]}
-            scale={50}
-            far={40}
-            {...shadowsControls}
-          />
-
-          {/* ENVIRONMENT */}
-          {/* <Sky {...skyControls} /> */}
-          <Environment
-            files="./environmentMaps/the_sky_is_on_fire_2k.hdr"
-            // preset="sunset"
-            background
-            // ground={{
-            //   height: 7,
-            //   radius: 28,
-            //   scale: 100
-            // }}
-            blur={1}
-          ></Environment>
-
-          {/* TEXT */}
-          {/* TODO: Explore some cool typography effects */}
-          <Billboard position-y={20}>
-            <Text
-              fontSize={5}
-              anchorY="bottom"
-              textAlign="center"
-              font="fonts/Gloock-Regular.ttf"
-            >
-              Everton Road
-              <meshStandardMaterial color="white" />
-            </Text>
-            <Text
-              fontSize={2}
-              anchorY="top"
-              textAlign="center"
-              font="fonts/Agbalumo-Regular.ttf"
-            >
-              Singapore
-              <meshStandardMaterial color="grey" />
-            </Text>
-          </Billboard>
-          {/* </group> */}
-        </>,
+            Everton Road
+            <meshStandardMaterial color="white" />
+          </Text>
+          <Text
+            fontSize={2}
+            anchorY="top"
+            textAlign="center"
+            font="fonts/Agbalumo-Regular.ttf"
+          >
+            Singapore
+            <meshStandardMaterial color="grey" />
+          </Text>
+        </Billboard>
+      </group>
+      {/* </>,
         renderedScene
-      )}
+      )} */}
     </>
   );
 };
