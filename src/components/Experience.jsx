@@ -44,7 +44,7 @@ const cameraPositions = {
 };
 
 export const Experience = () => {
-  const { viewport } = useThree();
+  const { viewport, camera } = useThree();
   const scrollData = useScroll();
 
   // REFS
@@ -55,6 +55,7 @@ export const Experience = () => {
   });
   const splats = useRef();
   const transmissionMesh = useRef();
+  const text = useRef()
 
   // LIGHT HELPERS
   const spotLight1 = useRef();
@@ -176,7 +177,7 @@ export const Experience = () => {
     });
 
     splats.current.material.transparent = false;
-    // scene.add(splats.current);
+    // renderedScene.add(splats.current);
 
     // INIT ANIMATIONS
     tl.current = gsap.timeline({ paused: true });
@@ -212,9 +213,9 @@ export const Experience = () => {
     }
 
     // MOVE CAMERA ON MOUSE MOVE
-    // cameraRotateTo.set(-pointer.x * 0.3, pointer.y * 0.2);
-    // cameraRotate.lerp(cameraRotateTo, delta * 1);
-    // cameraControls.current.rotate(cameraRotate.x, cameraRotate.y, false);
+    cameraRotateTo.set(-pointer.x * 0.3, pointer.y * 0.2);
+    cameraRotate.lerp(cameraRotateTo, delta * 1);
+    cameraControls.current.rotate(cameraRotate.x, cameraRotate.y, false);
 
     // RENDER SWITCHEROO
     // Setup first scene
@@ -242,6 +243,7 @@ export const Experience = () => {
     renderMaterial.current.map = renderTarget1.texture;
 
     // Transition animation
+    // FIXME: Flickering when progression updates
     renderMaterial.current.progression = MathUtils.lerp(
       renderMaterial.current.progression,
       transitionControls.progressionTarget,
@@ -252,7 +254,6 @@ export const Experience = () => {
   return (
     <>
       <Perf position="top-left" />
-
 
       {/* SCREEN */}
       <mesh position-z={-5}>
@@ -344,6 +345,7 @@ export const Experience = () => {
           </RoundedBox>
 
           {/* </Float> */}
+          {/* FIXME: Why not showing on render? */}
           <ContactShadows
             frames={1}
             position={[0, -10, 0]}
@@ -368,26 +370,29 @@ export const Experience = () => {
 
           {/* TEXT */}
           {/* TODO: Explore some cool typography effects */}
-          <Billboard position-y={20}>
-            <Text
-              fontSize={5}
-              anchorY="bottom"
-              textAlign="center"
-              font="fonts/Gloock-Regular.ttf"
-            >
-              Everton Road
-              <meshStandardMaterial color="white" />
-            </Text>
-            <Text
-              fontSize={2}
-              anchorY="top"
-              textAlign="center"
-              font="fonts/Agbalumo-Regular.ttf"
-            >
-              Singapore
-              <meshStandardMaterial color="grey" />
-            </Text>
-          </Billboard>
+          {/* FIXME: Why billboard not working? */}
+          {/* <Billboard */}
+            <group ref={text} position-y={20} rotation-y={MathUtils.degToRad(30)}>
+              <Text
+                fontSize={5}
+                anchorY="bottom"
+                textAlign="center"
+                font="fonts/Gloock-Regular.ttf"
+              >
+                Everton Road
+                <meshStandardMaterial color="white" />
+              </Text>
+              <Text
+                fontSize={2}
+                anchorY="top"
+                textAlign="center"
+                font="fonts/Agbalumo-Regular.ttf"
+              >
+                Singapore
+                <meshStandardMaterial color="grey" />
+              </Text>
+            </group>
+          {/* </Billboard> */}
           {/* </group> */}
         </>,
         renderedScene
