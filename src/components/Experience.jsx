@@ -54,7 +54,7 @@ const cameraPositions = {
   ],
 };
 
-const splatsScenes = [
+const splatProps = [
   {
     source: "https://lumalabs.ai/capture/87a96011-9ae7-4a2d-bbd0-be3e49c9362f",
   },
@@ -76,7 +76,7 @@ export const Experience = () => {
   const cameraData = useRef({
     position: cameraPositions.intro,
   });
-  const splats = useRef();
+  const splats = useRef([]);
   const transmissionMesh = useRef();
   const text = useRef();
   const mainScene = useRef();
@@ -203,25 +203,33 @@ export const Experience = () => {
     // INIT CAMERA
     cameraControls.current.setLookAt(...cameraPositions.intro, false);
 
+    // FIXME: useMemo makes it slow for some reason
     // INIT SPLATS
-    splats.current = new LumaSplatsThree({
-      source:
-        "https://lumalabs.ai/capture/87a96011-9ae7-4a2d-bbd0-be3e49c9362f",
-      loadingAnimationEnabled: false,
-      onBeforeRender: (renderer) => {
-        const renderTarget = renderer.getRenderTarget();
-        disableMSAA(renderTarget);
+    splats.current = splatProps.map((s) => {
+      const splat = new LumaSplatsThree({
+        source: s.source,
+        loadingAnimationEnabled: false,
+        onBeforeRender: (renderer) => {
+          const renderTarget = renderer.getRenderTarget();
+          disableMSAA(renderTarget);
 
-        // Disable rendering to canvas
-        // splats.current.preventDraw = renderTarget == null;
+          // Disable rendering to canvas
+          // splats.current.preventDraw = renderTarget == null;
 
-        // Disable rendering to transmission
-        // splats.current.preventDraw = renderTarget != null
-      },
+          // Disable rendering to transmission
+          // splats.current.preventDraw = renderTarget != null
+        },
+      });
+
+      splat.material.transparent = false;
+      splat.visible = false;
+
+      // TODO: Each splat has its own scene?
+
+      scene.add(splat);
+
+      return splat;
     });
-
-    splats.current.material.transparent = false;
-    scene.add(splats.current);
 
     // INIT ANIMATIONS
     tl.current = gsap
@@ -289,13 +297,13 @@ export const Experience = () => {
 
   // UPDATE SPLATS
   useEffect(() => {
-    splats.current.position.set(
+    splats.current[0].position.set(
       splatsControls.position.x,
       splatsControls.position.y,
       splatsControls.position.z
     );
-    splats.current.scale.setScalar(splatsControls.scale);
-    splats.current.rotation.set(
+    splats.current[0].scale.setScalar(splatsControls.scale);
+    splats.current[0].rotation.set(
       splatsControls.rotation.x,
       splatsControls.rotation.y,
       splatsControls.rotation.z
@@ -328,14 +336,14 @@ export const Experience = () => {
     // gl.render(rippleScene, rippleCamera.current);
 
     // Only render splat in transmission mesh
-    splats.current.visible = true;
+    splats.current[0].visible = true;
     transmissionMesh.current.visible = false;
     text.current.visible = false;
     gl.setRenderTarget(buffer);
     gl.render(scene, camera);
 
     gl.setRenderTarget(null);
-    splats.current.visible = false;
+    splats.current[0].visible = false;
     transmissionMesh.current.visible = true;
     text.current.visible = true;
   });
