@@ -54,16 +54,16 @@ const cameraPositions = {
   ],
 };
 
-const splatsScenes = [
+const splatProps = [
   {
     source: "https://lumalabs.ai/capture/87a96011-9ae7-4a2d-bbd0-be3e49c9362f",
   },
-  {
-    source: "https://lumalabs.ai/capture/419f25df-ec39-45c3-8e87-7eee6dbc24da",
-  },
-  {
-    source: "https://lumalabs.ai/capture/b8eec778-d960-48d3-8d5f-be5d57173827",
-  },
+  // {
+  //   source: "https://lumalabs.ai/capture/419f25df-ec39-45c3-8e87-7eee6dbc24da",
+  // },
+  // {
+  //   source: "https://lumalabs.ai/capture/b8eec778-d960-48d3-8d5f-be5d57173827",
+  // },
 ];
 
 export const Experience = () => {
@@ -76,7 +76,7 @@ export const Experience = () => {
   const cameraData = useRef({
     position: cameraPositions.intro,
   });
-  const splats = useRef();
+  // const splats = useRef();
   const transmissionMesh = useRef();
   const text = useRef();
   const mainScene = useRef();
@@ -107,13 +107,32 @@ export const Experience = () => {
   // const renderCamera = useRef();
   // const screenCamera = useRef()
 
-  // UNIFORMS
-  const uniforms = useMemo(() => {
-    return {
-      uTime: {
-        value: 0,
-      },
-    };
+  // INIT SPLATS
+  // FIXME: Why is it loading much slower?
+  // FIXME: Luma server problem? Should just download the splats
+  const splats = useMemo(() => {
+    return splatProps.map((s) => {
+      const splat = new LumaSplatsThree({
+        source: s.source,
+        loadingAnimationEnabled: false,
+        onBeforeRender: (renderer) => {
+          const renderTarget = renderer.getRenderTarget();
+          disableMSAA(renderTarget);
+
+          // Disable rendering to canvas
+          // splats.current.preventDraw = renderTarget == null;
+
+          // Disable rendering to transmission
+          // splats.current.preventDraw = renderTarget != null
+        },
+      });
+
+      splat.material.transparent = false;
+      // TODO: Add each splat to its own scene
+      scene.add(splat);
+
+      return splat;
+    });
   }, []);
 
   // CONTROLS
@@ -203,26 +222,6 @@ export const Experience = () => {
     // INIT CAMERA
     cameraControls.current.setLookAt(...cameraPositions.intro, false);
 
-    // INIT SPLATS
-    splats.current = new LumaSplatsThree({
-      source:
-        "https://lumalabs.ai/capture/87a96011-9ae7-4a2d-bbd0-be3e49c9362f",
-      loadingAnimationEnabled: false,
-      onBeforeRender: (renderer) => {
-        const renderTarget = renderer.getRenderTarget();
-        disableMSAA(renderTarget);
-
-        // Disable rendering to canvas
-        // splats.current.preventDraw = renderTarget == null;
-
-        // Disable rendering to transmission
-        // splats.current.preventDraw = renderTarget != null
-      },
-    });
-
-    splats.current.material.transparent = false;
-    scene.add(splats.current);
-
     // INIT ANIMATIONS
     tl.current = gsap
       .timeline({ paused: true })
@@ -289,13 +288,13 @@ export const Experience = () => {
 
   // UPDATE SPLATS
   useEffect(() => {
-    splats.current.position.set(
+    splats[0].position.set(
       splatsControls.position.x,
       splatsControls.position.y,
       splatsControls.position.z
     );
-    splats.current.scale.setScalar(splatsControls.scale);
-    splats.current.rotation.set(
+    splats[0].scale.setScalar(splatsControls.scale);
+    splats[0].rotation.set(
       splatsControls.rotation.x,
       splatsControls.rotation.y,
       splatsControls.rotation.z
@@ -328,14 +327,14 @@ export const Experience = () => {
     // gl.render(rippleScene, rippleCamera.current);
 
     // Only render splat in transmission mesh
-    splats.current.visible = true;
+    splats[0].visible = true;
     transmissionMesh.current.visible = false;
     text.current.visible = false;
     gl.setRenderTarget(buffer);
     gl.render(scene, camera);
 
     gl.setRenderTarget(null);
-    splats.current.visible = false;
+    splats[0].visible = false;
     transmissionMesh.current.visible = true;
     text.current.visible = true;
   });
@@ -344,18 +343,11 @@ export const Experience = () => {
     <>
       <Perf position="top-left" />
 
-      {/* FIXME: Can we just use RenderTexture for this? */}
       {/* RIPPLE TEXTURE */}
-      {/* <OrthographicCamera ref={rippleCamera} position={[0, 0, 10]} />
-      {createPortal(<RippleTexture />, rippleScene)} */}
-
       <RenderTexture ref={rippleTexture}>
         <OrthographicCamera makeDefault position={[0, 0, 10]} />
         <RippleTexture pointer={pointer} />
       </RenderTexture>
-
-      {/* <OrthographicCamera ref={rippleCamera} position={[0, 0, 10]} />
-      <RippleTexture /> */}
 
       {/* POSTPROCESSING */}
       <EffectComposer disableNormalPass multisampling={0}>
