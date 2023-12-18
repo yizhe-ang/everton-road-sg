@@ -13,6 +13,7 @@
     "@lumaai/luma-web": "^0.1.15",
     "@react-three/drei": "^9.92.1",
     "@react-three/fiber": "^8.15.12",
+    "@react-three/postprocessing": "^2.15.11",
     "@theatre/core": "0.5",
     "@theatre/r3f": "^0.6.2",
     "@theatre/studio": "0.5",
@@ -22,7 +23,9 @@
     "r3f-perf": "^7.1.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "three": "^0.159.0"
+    "resolve-lygia": "^1.0.4",
+    "three": "^0.159.0",
+    "three-custom-shader-material": "^5.4.0"
   },
   "devDependencies": {
     "@react-three/eslint-plugin": "^0.1.1",
