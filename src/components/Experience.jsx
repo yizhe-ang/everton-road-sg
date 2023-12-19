@@ -70,7 +70,7 @@ const splatProps = [
 ];
 
 export const Experience = () => {
-  const { pointer, scene, size } = useThree();
+  const { pointer, scene, size, viewport } = useThree();
   const scrollData = useScroll();
 
   // REFS
@@ -369,6 +369,8 @@ export const Experience = () => {
 
     // FIXME: Set uniforms directly here?
     // And not through the components? Lest it re-renders
+    screenMesh.current.material.uniforms.uTexture1.value = mainBuffer.texture
+    screenMesh.current.material.uniforms.uTexture2.value = secondBuffer.texture
   });
 
   return (
@@ -376,11 +378,14 @@ export const Experience = () => {
       {/* SCREEN */}
       {/* <OrthographicCamera makeDefault ref={screenCamera} position={[0, 0, 5]} /> */}
       <mesh ref={screenMesh}>
-        <planeGeometry args={[size.width, size.height]} />
+        <planeGeometry
+          // args={[size.width, size.height]}
+          args={[viewport.width, viewport.height]}
+        />
         <transitionMaterial
-          uTexture1={mainBuffer.texture}
-          uTexture2={secondBuffer.texture}
-          uProgress={0}
+          // uTexture1={mainBuffer.texture}
+          // uTexture2={secondBuffer.texture}
+          // uProgress={0}
           // {...transitionControls}
           toneMapped={false}
         />

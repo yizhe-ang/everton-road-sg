@@ -2,7 +2,7 @@ import { shaderMaterial } from "@react-three/drei";
 
 export const TransitionMaterial = shaderMaterial(
   {
-    uProgress: 1,
+    uProgress: 0,
     uTexture1: undefined,
     uTexture2: undefined,
     transition: 0,

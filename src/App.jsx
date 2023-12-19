@@ -13,7 +13,7 @@ function App() {
   return (
     <Canvas
       gl={{ antialias: false }}
-      orthographic
+      // orthographic
       camera={{position: [0, 0, 5]}}
     >
       <Perf position="top-left" />
