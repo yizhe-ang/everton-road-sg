@@ -1,3 +1,4 @@
+// FIXME: Why does the scene disappear on resize?
 import {
   MeshTransmissionMaterial,
   RoundedBox,
@@ -23,6 +24,8 @@ import { button, useControls } from "leva";
 import { Perf } from "r3f-perf";
 import * as THREE from "three";
 import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+gsap.registerPlugin(ScrollTrigger);
 import { MathUtils } from "three";
 import {
   DepthOfField,
@@ -61,9 +64,9 @@ const splatProps = [
   {
     source: "https://lumalabs.ai/capture/419f25df-ec39-45c3-8e87-7eee6dbc24da",
   },
-  {
-    source: "https://lumalabs.ai/capture/b8eec778-d960-48d3-8d5f-be5d57173827",
-  },
+  // {
+  //   source: "https://lumalabs.ai/capture/b8eec778-d960-48d3-8d5f-be5d57173827",
+  // },
 ];
 
 export const Experience = () => {
@@ -73,21 +76,31 @@ export const Experience = () => {
   // REFS
   const cameraControls = useRef();
   const tl = useRef();
-  const cameraData = useRef({
-    position: cameraPositions.intro,
-  });
+  // const cameraData = useRef({
+  //   position: cameraPositions.intro,
+  // });
   const splats = useRef([]);
   const transmissionMesh = useRef();
-  const text = useRef()
+  const text = useRef();
 
-  const mainScene = useRef();
-  const mainCamera = useRef()
+  const mainScene = new THREE.Scene();
+
+  const mainBuffer = useFBO();
+  const secondBuffer = useFBO();
+  const transmissionBuffer = useFBO();
+
+  const mainGroup = useRef();
+
+  const mainCamera = useRef();
+  const screenCamera = useRef();
 
   const transmissionTexture = useFBO();
 
   const rippleTexture = useRef();
 
-  const screenMesh = useRef()
+  const screenMesh = useRef();
+
+  const mainSceneTexture = useRef();
 
   // LIGHT HELPERS
   const spotLight1 = useRef();
@@ -101,20 +114,9 @@ export const Experience = () => {
   // const renderedScene = new THREE.Scene();
   // const renderedScene = useRef();
 
-  const renderTarget1 = useFBO();
-  const renderTarget2 = useFBO();
   // const renderMaterial = useRef();
   // const renderCamera = useRef();
   // const screenCamera = useRef()
-
-  // UNIFORMS
-  const uniforms = useMemo(() => {
-    return {
-      uTime: {
-        value: 0,
-      },
-    };
-  }, []);
 
   // CONTROLS
   useControls("Camera", {
@@ -202,11 +204,14 @@ export const Experience = () => {
     },
   });
 
+  const cameraData = useRef({
+    position: cameraPositions.intro,
+  });
+
   const animateProps = useRef({
     thickness: 0.24,
   });
 
-  // INIT
   useEffect(() => {
     // INIT CAMERA
     cameraControls.current.camera = mainCamera.current;
@@ -233,75 +238,83 @@ export const Experience = () => {
       splat.material.transparent = false;
       splat.visible = false;
 
-      // TODO: Each splat has its own scene?
-
-      scene.add(splat);
+      mainScene.add(splat);
 
       return splat;
     });
 
     // INIT ANIMATIONS
-    tl.current = gsap
-      .timeline({ paused: true })
-      // Zoom into splats
-      .to(cameraData.current.position, {
-        endArray: cameraPositions.first,
-        duration: 1,
-        // onUpdate: () => {
-        //   cameraControls.current.setLookAt(
-        //     ...cameraData.current.position,
-        //     false
-        //   );
-        // },
-      })
-      // Fade out transmission material
-      .to(transmissionMesh.current.material.uniforms.distortion, {
-        value: 0,
-        duration: 1,
-      })
-      // FIXME: What's up with this
-      .to(
-        animateProps.current,
-        {
-          thickness: 0,
-          duration: 1,
-        },
-        "<"
-      )
-      // .to(
-      //   transmissionMesh.current.material.uniforms.thickness,
-      //   {
-      //     value: 0.01,
-      //     duration: 1,
-      //   },
-      //   "<"
-      // )
-      .to(
-        transmissionMesh.current.material,
-        {
-          envMapIntensity: 0,
-          duration: 1,
-        },
-        "<"
-      )
-      .to(
-        transmissionMesh.current.scale,
-        {
-          x: 30,
-          // y: 30,
-          z: 30,
-          duration: 1,
-        },
-        "<"
-      )
-      // Bring text out of view
-      .to(
-        text.current.position,
-        {
-          y: 30,
-        },
-        "<"
-      );
+    // tl.current = gsap
+    //   .timeline({
+    //     paused: true
+    //     // scrollTrigger: {
+    //     //   trigger: "#root",
+    //     //   pin: true,
+    //     //   start: "top top",
+    //     //   end: "+=1000%",
+    //     //   scrub: 1,
+    //     // },
+    //   })
+    //   // Zoom into splats
+    //   .to(cameraData.current.position, {
+    //     endArray: cameraPositions.first,
+    //     duration: 1,
+    //     onUpdate: () => {
+    //       console.log('yo')
+    //       cameraControls.current.setLookAt(
+    //         ...cameraData.current.position,
+    //         false
+    //       );
+    //     },
+    //   });
+    //   // Fade out transmission material
+    //   .to(transmissionMesh.current.material.uniforms.distortion, {
+    //     value: 0,
+    //     duration: 1,
+    //   })
+    //   // FIXME: What's up with this
+    //   .to(
+    //     animateProps.current,
+    //     {
+    //       thickness: 0,
+    //       duration: 1,
+    //     },
+    //     "<"
+    //   )
+    //   // .to(
+    //   //   transmissionMesh.current.material.uniforms.thickness,
+    //   //   {
+    //   //     value: 0.01,
+    //   //     duration: 1,
+    //   //   },
+    //   //   "<"
+    //   // )
+    //   .to(
+    //     transmissionMesh.current.material,
+    //     {
+    //       envMapIntensity: 0,
+    //       duration: 1,
+    //     },
+    //     "<"
+    //   )
+    //   .to(
+    //     transmissionMesh.current.scale,
+    //     {
+    //       x: 30,
+    //       // y: 30,
+    //       z: 30,
+    //       duration: 1,
+    //     },
+    //     "<"
+    //   )
+    //   // Bring text out of view
+    //   .to(
+    //     text.current.position,
+    //     {
+    //       y: 30,
+    //     },
+    //     "<"
+    //   );
   }, []);
 
   // UPDATE SPLATS
@@ -319,81 +332,61 @@ export const Experience = () => {
     );
   }, [splatsControls]);
 
-  const cameraRotate = new THREE.Vector2();
-  const cameraRotateTo = new THREE.Vector2();
-
-  useFrame(({ gl, pointer, camera, scene }, delta) => {
+  useFrame(({ gl }) => {
     // UPDATE SCROLL ANIMATIONS
-    if (tl.current) {
-      tl.current.progress(scrollData.offset);
+    // if (tl.current) {
+    //   tl.current.progress(scrollData.offset);
 
-      // Update camera
-      cameraControls.current.setLookAt(...cameraData.current.position, false);
-    }
+    //   // Update camera
+    //   // cameraControls.current.setLookAt(...cameraData.current.position, false);
+    // }
 
-    // MOVE CAMERA ON MOUSE MOVE
-    cameraRotateTo.set(-pointer.x * 0.3, pointer.y * 0.2);
-    cameraRotate.lerp(cameraRotateTo, delta * 1);
-    cameraControls.current.rotate(cameraRotate.x, cameraRotate.y, false);
+    // Capture second scene
+    splats.current[0].visible = false;
+    splats.current[1].visible = true;
+    mainGroup.current.visible = false;
 
-    // FIXME: Why does it keep getting reset?
-    transmissionMesh.current.material.uniforms.thickness.value =
-      animateProps.current.thickness;
+    gl.setRenderTarget(secondBuffer);
+    gl.render(mainScene, mainCamera.current);
 
-    // Only render splat in transmission mesh
-    screenMesh.current.visible = false
+    // Capture transmission texture
     splats.current[0].visible = true;
     splats.current[1].visible = false;
-    mainScene.current.visible = false;
-    gl.setRenderTarget(transmissionTexture);
-    gl.render(scene, mainCamera.current);
+    mainGroup.current.visible = false;
 
-    // Capture 1st scene
+    gl.setRenderTarget(transmissionBuffer);
+    gl.render(mainScene, mainCamera.current);
+
+    // Capture main scene
     splats.current[0].visible = false;
-    mainScene.current.visible = true;
-    gl.setRenderTarget(renderTarget1)
-    gl.render(scene, mainCamera.current);
-
-    // Capture 2nd scene
-    splats.current[0].visible = false;
-    mainScene.current.visible = false;
-    splats.current[1].visible = true;
-    gl.setRenderTarget(renderTarget2)
-    gl.render(scene, mainCamera.current);
-
-    // Render to screen
-    screenMesh.current.visible = true
     splats.current[1].visible = false;
+    mainGroup.current.visible = true;
+
+    gl.setRenderTarget(mainBuffer);
+    gl.render(mainScene, mainCamera.current);
+
     gl.setRenderTarget(null);
+
+    // FIXME: Set uniforms directly here?
+    // And not through the components? Lest it re-renders
   });
 
   return (
     <>
-      <Perf position="top-left" />
+      {/* SCREEN */}
+      {/* <OrthographicCamera makeDefault ref={screenCamera} position={[0, 0, 5]} /> */}
+      <mesh ref={screenMesh}>
+        <planeGeometry args={[size.width, size.height]} />
+        <transitionMaterial
+          uTexture1={mainBuffer.texture}
+          uTexture2={secondBuffer.texture}
+          uProgress={0}
+          // {...transitionControls}
+          toneMapped={false}
+        />
+        {/* <meshBasicMaterial map={mainBuffer.texture} /> */}
+      </mesh>
 
-      {/* FIXME: Can we just use RenderTexture for this? */}
-      {/* RIPPLE TEXTURE */}
-      <RenderTexture ref={rippleTexture}>
-        <OrthographicCamera makeDefault position={[0, 0, 10]} />
-        <RippleTexture pointer={pointer} />
-      </RenderTexture>
-
-      {/* POSTPROCESSING */}
-      <EffectComposer disableNormalPass multisampling={0}>
-        {/* <Vignette /> */}
-        {/* <Noise
-          premultiply
-          blendFunction={BlendFunction}
-        /> */}
-        {/* <DepthOfField /> */}
-        {/* <Ripple uDisplacement={rippleRenderTarget.texture} /> */}
-        <Displacement uDisplacement={rippleTexture.current} />
-        <ToneMapping />
-      </EffectComposer>
-
-      {/* CONTROLS */}
-      <PerspectiveCamera ref={mainCamera} />
-      {/* FIXME: Which camera is this controlling? */}
       <CameraControls
         ref={cameraControls}
         mouseButtons={{
@@ -409,58 +402,36 @@ export const Experience = () => {
         }}
       />
 
-      {/* SCREEN */}
-      <OrthographicCamera
-        makeDefault
-      />
-      {/* <PerspectiveCamera
-        makeDefault
-        position={[0, 0, 10]}
-      /> */}
-      <mesh ref={screenMesh}>
-        <planeGeometry args={[size.width, size.height]} />
-        <transitionMaterial
-          uTexture1={renderTarget1.texture}
-          uTexture2={renderTarget2.texture}
-          {...transitionControls}
-          toneMapped={false}
-        />
-      </mesh>
-      {/* <mesh position-z={-5}>
-        <planeGeometry args={[viewport.width, viewport.height]} />
-        <transitionMaterial
-          ref={renderMaterial}
-          tex={renderTarget1.texture}
-          tex2={renderTarget2.texture}
-          toneMapped={false}
-        />
-      </mesh> */}
+      {/* MAIN SCENE */}
+      {createPortal(
+        <>
+          <PerspectiveCamera makeDefault ref={mainCamera} />
 
+          {/* <primitive object={splats.current[0]} /> */}
 
-      {/* SCENE */}
-      <group ref={mainScene}>
-        {/* LIGHTING */}
-        <ambientLight intensity={Math.PI / 4} />
-        <spotLight
-          ref={spotLight1}
-          position={[0, 40, 26]}
-          angle={0.5}
-          decay={0.7}
-          distance={48}
-          penumbra={1}
-          intensity={1750}
-        />
-        <spotLight
-          ref={spotLight2}
-          color="white"
-          position={[20, -40, 26]}
-          angle={0.5}
-          decay={1}
-          distance={53}
-          penumbra={1}
-          intensity={2000}
-        />
-        {/* <spotLight
+          <group ref={mainGroup}>
+            {/* LIGHTING */}
+            <ambientLight intensity={Math.PI / 4} />
+            <spotLight
+              ref={spotLight1}
+              position={[0, 40, 26]}
+              angle={0.5}
+              decay={0.7}
+              distance={48}
+              penumbra={1}
+              intensity={1750}
+            />
+            <spotLight
+              ref={spotLight2}
+              color="white"
+              position={[20, -40, 26]}
+              angle={0.5}
+              decay={1}
+              distance={53}
+              penumbra={1}
+              intensity={2000}
+            />
+            {/* <spotLight
         ref={spotLight3}
         color="red"
         position={[15, 0, 20]}
@@ -471,80 +442,84 @@ export const Experience = () => {
         intensity={100}
       /> */}
 
-        {/* TRANSMISSION MESH */}
-        {/* <Float> */}
-        {/* TODO: Use MeshPortalMaterial? */}
-        {/* FIXME: Can't do transition effects with transmission material? */}
-        {/* TODO: Can use a different model? Like a toy box */}
-        <RoundedBox
-          ref={transmissionMesh}
-          args={[1.15, 1, 1]}
-          radius={0.05}
-          scale={17}
-          position-y={5}
-        >
-          {/* TODO: Low samples and low resolution to make it faster */}
-          <MeshTransmissionMaterial
-            buffer={transmissionTexture.texture}
-            // buffer={rippleRenderTarget.texture}
-            backsideResolution={128}
-            backsideThickness={-0.25}
-            backsideRoughness={0.3}
-            clearcoatRoughness={0.1}
-            // thickness={0.24}
-            {...transmissionControls}
-            {...envControls}
-            // transparent
-            // opacity={0.1}
-          />
-        </RoundedBox>
+            {/* TRANSMISSION MESH */}
+            {/* <Float> */}
+            {/* TODO: Use MeshPortalMaterial? */}
+            {/* FIXME: Can't do transition effects with transmission material? */}
+            {/* TODO: Can use a different model? Like a toy box */}
+            <RoundedBox
+              ref={transmissionMesh}
+              args={[1.15, 1, 1]}
+              radius={0.05}
+              scale={17}
+              position-y={5}
+            >
+              {/* TODO: Low samples and low resolution to make it faster */}
+              <MeshTransmissionMaterial
+                buffer={transmissionBuffer.texture}
+                backsideResolution={128}
+                backsideThickness={-0.25}
+                backsideRoughness={0.3}
+                clearcoatRoughness={0.1}
+                // thickness={0.24}
+                {...transmissionControls}
+                {...envControls}
+              >
+                {/* <RenderTexture attach={"buffer"}>
+              {splats.current[0] && <primitive object={splats.current[0]} />}
+            </RenderTexture> */}
+              </MeshTransmissionMaterial>
+            </RoundedBox>
 
-        {/* </Float> */}
-        <ContactShadows
-          frames={1}
-          position={[0, -10, 0]}
-          scale={50}
-          far={40}
-          {...shadowsControls}
-        />
+            {/* </Float> */}
+            <ContactShadows
+              frames={1}
+              position={[0, -10, 0]}
+              scale={50}
+              far={40}
+              {...shadowsControls}
+            />
 
-        {/* ENVIRONMENT */}
-        {/* <Sky {...skyControls} /> */}
-        <Environment
-          files="./environmentMaps/the_sky_is_on_fire_2k.hdr"
-          // preset="sunset"
-          background
-          // ground={{
-          //   height: 7,
-          //   radius: 28,
-          //   scale: 100
-          // }}
-          blur={1}
-        ></Environment>
+            {/* ENVIRONMENT */}
+            {/* <Sky {...skyControls} /> */}
+            <Environment
+              files="./environmentMaps/the_sky_is_on_fire_2k.hdr"
+              // preset="sunset"
+              background
+              // ground={{
+              //   height: 7,
+              //   radius: 28,
+              //   scale: 100
+              // }}
+              blur={1}
+            ></Environment>
 
-        {/* TEXT */}
-        {/* TODO: Explore some cool typography effects */}
-        <Billboard position-y={20} ref={text}>
-          <Text
-            fontSize={5}
-            anchorY="bottom"
-            textAlign="center"
-            font="fonts/Gloock-Regular.ttf"
-          >
-            Everton Road
-            <meshStandardMaterial color="white" />
-          </Text>
-          <Text
-            fontSize={2}
-            anchorY="top"
-            textAlign="center"
-            font="fonts/Agbalumo-Regular.ttf"
-          >
-            Singapore
-            <meshStandardMaterial color="grey" />
-          </Text>
-        </Billboard>
-      </group>
+            {/* TEXT */}
+            {/* TODO: Explore some cool typography effects */}
+            <Billboard position-y={20} ref={text}>
+              <Text
+                fontSize={5}
+                anchorY="bottom"
+                textAlign="center"
+                font="fonts/Gloock-Regular.ttf"
+              >
+                Everton Road
+                <meshStandardMaterial color="white" />
+              </Text>
+              <Text
+                fontSize={2}
+                anchorY="top"
+                textAlign="center"
+                font="fonts/Agbalumo-Regular.ttf"
+              >
+                Singapore
+                <meshStandardMaterial color="grey" />
+              </Text>
+            </Billboard>
+          </group>
+        </>,
+        mainScene
+      )}
     </>
   );
 };
