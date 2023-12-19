@@ -14,14 +14,14 @@ function App() {
     <Canvas
       gl={{ antialias: false }}
       // orthographic
-      camera={{position: [0, 0, 5]}}
+      camera={{ position: [0, 0, 5], fov: 30 }}
     >
       <Perf position="top-left" />
       {/* FIXME: Just use ScrollTrigger? */}
       {/* <ScrollControls pages={5}> */}
-        {/* FIXME: Need fog? */}
-        {/* <fog attach="fog" args={["white", 27.5, 75]} /> */}
-        <Experience />
+      {/* FIXME: Need fog? */}
+      {/* <fog attach="fog" args={["white", 27.5, 75]} /> */}
+      <Experience />
       {/* </ScrollControls> */}
     </Canvas>
   );

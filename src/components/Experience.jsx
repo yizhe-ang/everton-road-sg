@@ -71,7 +71,6 @@ const splatProps = [
 
 export const Experience = () => {
   const { pointer, scene, size, viewport } = useThree();
-  const scrollData = useScroll();
 
   // REFS
   const cameraControls = useRef();
@@ -85,13 +84,13 @@ export const Experience = () => {
 
   const mainScene = new THREE.Scene();
 
-  const mainBuffer = useFBO();
-  const secondBuffer = useFBO();
+  const renderTarget1 = useFBO();
+  const renderTarget2 = useFBO();
   const transmissionBuffer = useFBO();
 
   const mainGroup = useRef();
 
-  const mainCamera = useRef();
+  const renderCamera = useRef();
   const screenCamera = useRef();
 
   const transmissionTexture = useFBO();
@@ -214,7 +213,7 @@ export const Experience = () => {
 
   useEffect(() => {
     // INIT CAMERA
-    cameraControls.current.camera = mainCamera.current;
+    cameraControls.current.camera = renderCamera.current;
     cameraControls.current.setLookAt(...cameraPositions.intro, false);
 
     // FIXME: useMemo makes it slow for some reason
@@ -238,7 +237,7 @@ export const Experience = () => {
       splat.material.transparent = false;
       splat.visible = false;
 
-      mainScene.add(splat);
+      scene.add(splat);
 
       return splat;
     });
@@ -332,7 +331,7 @@ export const Experience = () => {
     );
   }, [splatsControls]);
 
-  useFrame(({ gl }) => {
+  useFrame(({ scene, gl }) => {
     // UPDATE SCROLL ANIMATIONS
     // if (tl.current) {
     //   tl.current.progress(scrollData.offset);
@@ -341,102 +340,115 @@ export const Experience = () => {
     //   // cameraControls.current.setLookAt(...cameraData.current.position, false);
     // }
 
-    // Capture second scene
-    splats.current[0].visible = false;
-    splats.current[1].visible = true;
-    mainGroup.current.visible = false;
-
-    gl.setRenderTarget(secondBuffer);
-    gl.render(mainScene, mainCamera.current);
+    screenMesh.current.visible = false;
 
     // Capture transmission texture
+    gl.setRenderTarget(transmissionBuffer);
+
     splats.current[0].visible = true;
     splats.current[1].visible = false;
     mainGroup.current.visible = false;
 
-    gl.setRenderTarget(transmissionBuffer);
-    gl.render(mainScene, mainCamera.current);
+    gl.render(scene, renderCamera.current);
 
-    // Capture main scene
+    // Render first scene
+    gl.setRenderTarget(renderTarget1);
+
     splats.current[0].visible = false;
     splats.current[1].visible = false;
     mainGroup.current.visible = true;
 
-    gl.setRenderTarget(mainBuffer);
-    gl.render(mainScene, mainCamera.current);
+    gl.render(scene, renderCamera.current);
+
+    // Render second scene
+    gl.setRenderTarget(renderTarget2);
+
+    splats.current[0].visible = false;
+    splats.current[1].visible = true;
+    mainGroup.current.visible = false;
+
+    gl.render(scene, renderCamera.current);
+
+    splats.current[0].visible = false;
+    splats.current[1].visible = false;
+    mainGroup.current.visible = false;
+
+    screenMesh.current.visible = true;
 
     gl.setRenderTarget(null);
-
-    // FIXME: Set uniforms directly here?
-    // And not through the components? Lest it re-renders
-    screenMesh.current.material.uniforms.uTexture1.value = mainBuffer.texture
-    screenMesh.current.material.uniforms.uTexture2.value = secondBuffer.texture
+    screenMesh.current.material.map = renderTarget1.texture;
   });
 
   return (
     <>
+      {/* RIPPLE TEXTURE */}
+      <RenderTexture ref={rippleTexture}>
+        <OrthographicCamera makeDefault position={[0, 0, 10]} />
+        <RippleTexture pointer={pointer} />
+      </RenderTexture>
+
+      {/* POSTPROCESSING */}
+      {/* <EffectComposer disableNormalPass multisampling={0}>
+        <Displacement uDisplacement={rippleTexture.current} />
+        <ToneMapping />
+      </EffectComposer> */}
+
       {/* SCREEN */}
-      {/* <OrthographicCamera makeDefault ref={screenCamera} position={[0, 0, 5]} /> */}
       <mesh ref={screenMesh}>
         <planeGeometry
           // args={[size.width, size.height]}
           args={[viewport.width, viewport.height]}
         />
         <transitionMaterial
-          // uTexture1={mainBuffer.texture}
-          // uTexture2={secondBuffer.texture}
+          uTexture1={renderTarget1.texture}
+          uTexture2={renderTarget2.texture}
           // uProgress={0}
-          // {...transitionControls}
+          {...transitionControls}
           toneMapped={false}
         />
         {/* <meshBasicMaterial map={mainBuffer.texture} /> */}
       </mesh>
 
+      {/* MAIN SCENE */}
+      <PerspectiveCamera near={0.5} ref={renderCamera} />
       <CameraControls
         ref={cameraControls}
-        mouseButtons={{
-          left: 0,
-          middle: 0,
-          right: 0,
-          wheel: 0,
-        }}
-        touches={{
-          one: 0,
-          two: 0,
-          three: 0,
-        }}
+        // mouseButtons={{
+        //   left: 0,
+        //   middle: 0,
+        //   right: 0,
+        //   wheel: 0,
+        // }}
+        // touches={{
+        //   one: 0,
+        //   two: 0,
+        //   three: 0,
+        // }}
       />
 
-      {/* MAIN SCENE */}
-      {createPortal(
-        <>
-          <PerspectiveCamera makeDefault ref={mainCamera} />
-
-          {/* <primitive object={splats.current[0]} /> */}
-
-          <group ref={mainGroup}>
-            {/* LIGHTING */}
-            <ambientLight intensity={Math.PI / 4} />
-            <spotLight
-              ref={spotLight1}
-              position={[0, 40, 26]}
-              angle={0.5}
-              decay={0.7}
-              distance={48}
-              penumbra={1}
-              intensity={1750}
-            />
-            <spotLight
-              ref={spotLight2}
-              color="white"
-              position={[20, -40, 26]}
-              angle={0.5}
-              decay={1}
-              distance={53}
-              penumbra={1}
-              intensity={2000}
-            />
-            {/* <spotLight
+      <group ref={mainGroup}>
+        {/* LIGHTING */}
+        <ambientLight intensity={Math.PI / 4} />
+        <spotLight
+          ref={spotLight1}
+          position={[0, 40, 26]}
+          angle={0.5}
+          decay={0.7}
+          distance={48}
+          penumbra={1}
+          intensity={1750}
+        />
+        <spotLight
+          ref={spotLight2}
+          color="white"
+          position={[20, -40, 26]}
+          angle={0.5}
+          decay={1}
+          distance={53}
+          penumbra={1}
+          intensity={2000}
+        />
+        {/* <spotLight
         ref={spotLight3}
         color="red"
         position={[15, 0, 20]}
@@ -447,84 +459,81 @@ export const Experience = () => {
         intensity={100}
       /> */}
 
-            {/* TRANSMISSION MESH */}
-            {/* <Float> */}
-            {/* TODO: Use MeshPortalMaterial? */}
-            {/* FIXME: Can't do transition effects with transmission material? */}
-            {/* TODO: Can use a different model? Like a toy box */}
-            <RoundedBox
-              ref={transmissionMesh}
-              args={[1.15, 1, 1]}
-              radius={0.05}
-              scale={17}
-              position-y={5}
-            >
-              {/* TODO: Low samples and low resolution to make it faster */}
-              <MeshTransmissionMaterial
-                buffer={transmissionBuffer.texture}
-                backsideResolution={128}
-                backsideThickness={-0.25}
-                backsideRoughness={0.3}
-                clearcoatRoughness={0.1}
-                // thickness={0.24}
-                {...transmissionControls}
-                {...envControls}
-              >
-                {/* <RenderTexture attach={"buffer"}>
+        {/* TRANSMISSION MESH */}
+        {/* <Float> */}
+        {/* TODO: Use MeshPortalMaterial? */}
+        {/* FIXME: Can't do transition effects with transmission material? */}
+        {/* TODO: Can use a different model? Like a toy box */}
+        <RoundedBox
+          ref={transmissionMesh}
+          args={[1.15, 1, 1]}
+          radius={0.05}
+          scale={17}
+          position-y={5}
+        >
+          {/* TODO: Low samples and low resolution to make it faster */}
+          <MeshTransmissionMaterial
+            buffer={transmissionBuffer.texture}
+            backsideResolution={128}
+            backsideThickness={-0.25}
+            backsideRoughness={0.3}
+            clearcoatRoughness={0.1}
+            // thickness={0.24}
+            {...transmissionControls}
+            {...envControls}
+          >
+            {/* <RenderTexture attach={"buffer"}>
               {splats.current[0] && <primitive object={splats.current[0]} />}
             </RenderTexture> */}
-              </MeshTransmissionMaterial>
-            </RoundedBox>
+          </MeshTransmissionMaterial>
+        </RoundedBox>
 
-            {/* </Float> */}
-            <ContactShadows
-              frames={1}
-              position={[0, -10, 0]}
-              scale={50}
-              far={40}
-              {...shadowsControls}
-            />
+        {/* </Float> */}
+        <ContactShadows
+          frames={1}
+          position={[0, -10, 0]}
+          scale={50}
+          far={40}
+          {...shadowsControls}
+        />
 
-            {/* ENVIRONMENT */}
-            {/* <Sky {...skyControls} /> */}
-            <Environment
-              files="./environmentMaps/the_sky_is_on_fire_2k.hdr"
-              // preset="sunset"
-              background
-              // ground={{
-              //   height: 7,
-              //   radius: 28,
-              //   scale: 100
-              // }}
-              blur={1}
-            ></Environment>
+        {/* ENVIRONMENT */}
+        {/* <Sky {...skyControls} /> */}
+        <Environment
+          files="./environmentMaps/the_sky_is_on_fire_2k.hdr"
+          // preset="sunset"
+          background
+          // ground={{
+          //   height: 7,
+          //   radius: 28,
+          //   scale: 100
+          // }}
+          blur={1}
+        ></Environment>
 
-            {/* TEXT */}
-            {/* TODO: Explore some cool typography effects */}
-            <Billboard position-y={20} ref={text}>
-              <Text
-                fontSize={5}
-                anchorY="bottom"
-                textAlign="center"
-                font="fonts/Gloock-Regular.ttf"
-              >
-                Everton Road
-                <meshStandardMaterial color="white" />
-              </Text>
-              <Text
-                fontSize={2}
-                anchorY="top"
-                textAlign="center"
-                font="fonts/Agbalumo-Regular.ttf"
-              >
-                Singapore
-                <meshStandardMaterial color="grey" />
-              </Text>
-            </Billboard>
-          </group>
-        </>,
-        mainScene
-      )}
+        {/* TEXT */}
+        {/* TODO: Explore some cool typography effects */}
+        <Billboard position-y={20} ref={text}>
+          <Text
+            fontSize={5}
+            anchorY="bottom"
+            textAlign="center"
+            font="fonts/Gloock-Regular.ttf"
+          >
+            Everton Road
+            <meshStandardMaterial color="white" />
+          </Text>
+          <Text
+            fontSize={2}
+            anchorY="top"
+            textAlign="center"
+            font="fonts/Agbalumo-Regular.ttf"
+          >
+            Singapore
+            <meshStandardMaterial color="grey" />
+          </Text>
+        </Billboard>
+      </group>
     </>
   );
 };
