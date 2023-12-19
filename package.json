@@ -2,7 +2,7 @@
   "name": "everton-road-sg",
   "private": true,
   "version": "0.0.0",
-  "homepage": "https://yizhe-ang.github.io/everton-road-sg",
+  "homepage": "https://yizhe-ang.github.io/everton-road-sg/",
   "type": "module",
   "scripts": {
     "dev": "vite",
