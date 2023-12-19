@@ -26,6 +26,7 @@
     "r3f-perf": "^7.1.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-router-dom": "^6.21.0",
     "resolve-lygia": "^1.0.4",
     "three": "^0.159.0",
     "three-custom-shader-material": "^5.4.0"
