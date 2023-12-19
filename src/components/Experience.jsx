@@ -37,6 +37,10 @@ import {
 import Displacement from "./Displacement";
 import { RippleTexture } from "./RippleTexture";
 
+// FIXME: useMemo?
+// const cameraRotate = new THREE.Vector2();
+// const cameraRotateBy = new THREE.Vector2();
+
 function disableMSAA(target) {
   // disable MSAA on render targets (in this case the transmission render target)
   // this improves splatting performance
@@ -47,13 +51,29 @@ function disableMSAA(target) {
 
 const cameraPositions = {
   // intro: [21.707168377678304, 13.893007782474893, 30.59057331563459, 0, 0, 0],
+  // intro: [
+  //   20.06849559824884, 20.591704884512403, 28.711102001421885,
+  //   -1.6386727794294618, 6.698697102037511, -1.8794713142127077,
+  // ],
   intro: [
-    20.06849559824884, 20.591704884512403, 28.711102001421885,
+    31.0814054001045, 27.640180250935998, 44.23091641713191,
     -1.6386727794294618, 6.698697102037511, -1.8794713142127077,
   ],
+  // intro: {
+  //   position: [31.0814054001045, 27.640180250935998, 44.23091641713191],
+  //   rotation: [0.6171420227625866, 1.2160791165053084],
+  // },
   first: [
     0.03290476337967078, 5.076205399137682, 18.35918306555744,
     0.059181256326662754, 4.79112616756302, -1.858920041560228,
+  ],
+  second: [
+    13.158933526860993, 5.903435092595209, 17.050581293867282,
+    13.183015351089564, 5.642161597038238, -1.4792102528298048,
+  ],
+  third: [
+    15.098788347310514, 6.3082217978470965, -1.4444576751603997,
+    15.098788575511467, 6.308221449416248, -1.4444613428454642,
   ],
 };
 
@@ -71,6 +91,7 @@ const splatProps = [
 
 export const Experience = () => {
   const { pointer, scene, size, viewport } = useThree();
+  const scrollData = useScroll();
 
   // REFS
   const cameraControls = useRef();
@@ -86,14 +107,13 @@ export const Experience = () => {
 
   const renderTarget1 = useFBO();
   const renderTarget2 = useFBO();
+
   const transmissionBuffer = useFBO();
 
   const mainGroup = useRef();
 
   const renderCamera = useRef();
-  const screenCamera = useRef();
-
-  const transmissionTexture = useFBO();
+  const cameraGroup = useRef();
 
   const rippleTexture = useRef();
 
@@ -144,13 +164,27 @@ export const Experience = () => {
     attenuationDistance: { value: 1.05, min: 0, max: 10, step: 0.01 },
   });
 
-  const splatsControls = useControls("Splats", {
+  const splat1Controls = useControls("Splat 1", {
     position: {
-      value: { x: -0.2, y: -1.3, z: -3.0 },
+      value: { x: -4.1, y: -0.8, z: -10.0 },
       step: 0.1,
     },
     rotation: {
       value: { x: 0.2, y: 0.3, z: 0 },
+      step: 0.05,
+    },
+    scale: {
+      value: 5,
+    },
+  });
+
+  const splat2Controls = useControls("Splat 2", {
+    position: {
+      value: { x: 14.8, y: 6.7, z: 1.7 },
+      step: 0.1,
+    },
+    rotation: {
+      value: { x: 0.05, y: -1.7, z: 0.05 },
       step: 0.05,
     },
     scale: {
@@ -243,102 +277,165 @@ export const Experience = () => {
     });
 
     // INIT ANIMATIONS
-    // tl.current = gsap
-    //   .timeline({
-    //     paused: true
-    //     // scrollTrigger: {
-    //     //   trigger: "#root",
-    //     //   pin: true,
-    //     //   start: "top top",
-    //     //   end: "+=1000%",
-    //     //   scrub: 1,
-    //     // },
-    //   })
-    //   // Zoom into splats
-    //   .to(cameraData.current.position, {
-    //     endArray: cameraPositions.first,
-    //     duration: 1,
-    //     onUpdate: () => {
-    //       console.log('yo')
-    //       cameraControls.current.setLookAt(
-    //         ...cameraData.current.position,
-    //         false
-    //       );
-    //     },
-    //   });
-    //   // Fade out transmission material
-    //   .to(transmissionMesh.current.material.uniforms.distortion, {
-    //     value: 0,
-    //     duration: 1,
-    //   })
-    //   // FIXME: What's up with this
-    //   .to(
-    //     animateProps.current,
-    //     {
-    //       thickness: 0,
-    //       duration: 1,
-    //     },
-    //     "<"
-    //   )
-    //   // .to(
-    //   //   transmissionMesh.current.material.uniforms.thickness,
-    //   //   {
-    //   //     value: 0.01,
-    //   //     duration: 1,
-    //   //   },
-    //   //   "<"
-    //   // )
-    //   .to(
-    //     transmissionMesh.current.material,
-    //     {
-    //       envMapIntensity: 0,
-    //       duration: 1,
-    //     },
-    //     "<"
-    //   )
-    //   .to(
-    //     transmissionMesh.current.scale,
-    //     {
-    //       x: 30,
-    //       // y: 30,
-    //       z: 30,
-    //       duration: 1,
-    //     },
-    //     "<"
-    //   )
-    //   // Bring text out of view
-    //   .to(
-    //     text.current.position,
-    //     {
-    //       y: 30,
-    //     },
-    //     "<"
-    //   );
+    tl.current = gsap
+      .timeline({
+        paused: true,
+      })
+      // Zoom into splats
+      .to(cameraData.current.position, {
+        endArray: cameraPositions.first,
+        duration: 1,
+        onUpdate: () => {
+          cameraControls.current.setLookAt(
+            ...cameraData.current.position,
+            false
+          );
+        },
+      })
+      // Fade out transmission material
+      .to(transmissionMesh.current.material.uniforms.distortion, {
+        value: 0,
+        duration: 1,
+      })
+      // FIXME: What's up with this
+      .to(
+        animateProps.current,
+        {
+          thickness: 0,
+          duration: 1,
+        },
+        "<"
+      )
+      .to(
+        transmissionMesh.current.material,
+        {
+          envMapIntensity: 0,
+          duration: 1,
+        },
+        "<"
+      )
+      .to(
+        transmissionMesh.current.scale,
+        {
+          x: 50,
+          y: 30,
+          // z: 40,
+          duration: 1,
+        },
+        "<"
+      )
+      // Bring text out of view
+      .to(
+        text.current.position,
+        {
+          y: 30,
+        },
+        "<"
+      )
+      // Adjust splat position
+      .to(
+        splats.current[0].position,
+        {
+          x: -5,
+          y: 5.2,
+          z: -15.6,
+        },
+        "<"
+      )
+      // Pan over first splat
+      .to(cameraData.current.position, {
+        endArray: cameraPositions.second,
+        duration: 1,
+        onUpdate: () => {
+          cameraControls.current.setLookAt(
+            ...cameraData.current.position,
+            false
+          );
+        },
+      })
+      // Transition to second splat
+      .to(screenMesh.current.material.uniforms.uProgress, {
+        value: 1,
+        duration: 1,
+      })
+      // Pan over second splat
+      .to(cameraData.current.position, {
+        endArray: cameraPositions.third,
+        duration: 1,
+        onUpdate: () => {
+          cameraControls.current.setLookAt(
+            ...cameraData.current.position,
+            false
+          );
+        },
+      });
   }, []);
 
   // UPDATE SPLATS
   useEffect(() => {
     splats.current[0].position.set(
-      splatsControls.position.x,
-      splatsControls.position.y,
-      splatsControls.position.z
+      splat1Controls.position.x,
+      splat1Controls.position.y,
+      splat1Controls.position.z
     );
-    splats.current[0].scale.setScalar(splatsControls.scale);
+    splats.current[0].scale.setScalar(splat1Controls.scale);
     splats.current[0].rotation.set(
-      splatsControls.rotation.x,
-      splatsControls.rotation.y,
-      splatsControls.rotation.z
+      splat1Controls.rotation.x,
+      splat1Controls.rotation.y,
+      splat1Controls.rotation.z
     );
-  }, [splatsControls]);
+  }, [splat1Controls]);
 
-  useFrame(({ scene, gl }) => {
+  useEffect(() => {
+    splats.current[1].position.set(
+      splat2Controls.position.x,
+      splat2Controls.position.y,
+      splat2Controls.position.z
+    );
+    splats.current[1].scale.setScalar(splat2Controls.scale);
+    splats.current[1].rotation.set(
+      splat2Controls.rotation.x,
+      splat2Controls.rotation.y,
+      splat2Controls.rotation.z
+    );
+  }, [splat2Controls]);
+
+  useFrame(({ scene, gl, clock }, delta) => {
+    // Update time
+    screenMesh.current.material.uniforms.uTime = clock.getElapsedTime();
+
+    // Make text always look at camera
+    text.current.lookAt(renderCamera.current.position);
+    // text.current.lookAt(cameraGroup.current.position);
+
+    // FIXME: Why does it keep getting reset?
+    transmissionMesh.current.material.uniforms.thickness.value =
+      animateProps.current.thickness;
+
+    // ROTATE CAMERA ON MOUSE MOVE
+    cameraGroup.current.rotation.y = THREE.MathUtils.lerp(
+      cameraGroup.current.rotation.y,
+      (pointer.x * Math.PI) / 10,
+      0.05
+    );
+    cameraGroup.current.rotation.x = THREE.MathUtils.lerp(
+      cameraGroup.current.rotation.x,
+      (pointer.y * Math.PI) / 10,
+      0.05
+    );
+
+    // cameraRotateBy.set(pointer.x * 0.007, pointer.y * 0.007);
+    // cameraRotate.lerp(cameraRotateBy, delta * 2);
+    // cameraControls.current.rotate(
+    //   cameraRotateBy.x - cameraRotate.x,
+    //   cameraRotateBy.y - cameraRotate.y,
+    //   false
+    // );
+
     // UPDATE SCROLL ANIMATIONS
-    // if (tl.current) {
-    //   tl.current.progress(scrollData.offset);
-
-    //   // Update camera
-    //   // cameraControls.current.setLookAt(...cameraData.current.position, false);
-    // }
+    if (tl.current) {
+      tl.current.progress(scrollData.offset);
+    }
 
     screenMesh.current.visible = false;
 
@@ -381,39 +478,42 @@ export const Experience = () => {
 
   return (
     <>
-      {/* RIPPLE TEXTURE */}
-      <RenderTexture ref={rippleTexture}>
-        <OrthographicCamera makeDefault position={[0, 0, 10]} />
-        <RippleTexture pointer={pointer} />
-      </RenderTexture>
-
       {/* SCREEN */}
       <mesh ref={screenMesh}>
         <planeGeometry args={[viewport.width, viewport.height]} />
         <transitionMaterial
-          uDisplacement={rippleTexture.current}
+          // uTexture1={rippleTexture.current}
           uTexture1={renderTarget1.texture}
           uTexture2={renderTarget2.texture}
           {...transitionControls}
           toneMapped={false}
-        />
+        >
+          {/* RIPPLE TEXTURE */}
+          <RenderTexture ref={rippleTexture} attach={"uDisplacement"}>
+            <OrthographicCamera makeDefault position={[0, 0, 10]} />
+            <RippleTexture pointer={pointer} />
+          </RenderTexture>
+        </transitionMaterial>
       </mesh>
 
       {/* MAIN SCENE */}
-      <PerspectiveCamera near={0.5} ref={renderCamera} />
+      {/* FIXME: Use a group to perform rotation independently on mouse move? */}
+      <group ref={cameraGroup}>
+        <PerspectiveCamera near={0.5} ref={renderCamera} />
+      </group>
       <CameraControls
         ref={cameraControls}
-        // mouseButtons={{
-        //   left: 0,
-        //   middle: 0,
-        //   right: 0,
-        //   wheel: 0,
-        // }}
-        // touches={{
-        //   one: 0,
-        //   two: 0,
-        //   three: 0,
-        // }}
+        mouseButtons={{
+          left: 0,
+          middle: 0,
+          right: 0,
+          wheel: 0,
+        }}
+        touches={{
+          one: 0,
+          two: 0,
+          three: 0,
+        }}
       />
 
       <group ref={mainGroup}>
@@ -478,7 +578,7 @@ export const Experience = () => {
           </MeshTransmissionMaterial>
         </RoundedBox>
 
-        {/* </Float> */}
+        {/* FIXME: ContactShadows is gone */}
         <ContactShadows
           frames={1}
           position={[0, -10, 0]}
@@ -503,7 +603,7 @@ export const Experience = () => {
 
         {/* TEXT */}
         {/* TODO: Explore some cool typography effects */}
-        <Billboard position-y={20} ref={text}>
+        <group position-y={20} ref={text}>
           <Text
             fontSize={5}
             anchorY="bottom"
@@ -522,7 +622,7 @@ export const Experience = () => {
             Singapore
             <meshStandardMaterial color="grey" />
           </Text>
-        </Billboard>
+        </group>
       </group>
     </>
   );
