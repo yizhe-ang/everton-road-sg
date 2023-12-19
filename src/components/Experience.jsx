@@ -387,26 +387,16 @@ export const Experience = () => {
         <RippleTexture pointer={pointer} />
       </RenderTexture>
 
-      {/* POSTPROCESSING */}
-      {/* <EffectComposer disableNormalPass multisampling={0}>
-        <Displacement uDisplacement={rippleTexture.current} />
-        <ToneMapping />
-      </EffectComposer> */}
-
       {/* SCREEN */}
       <mesh ref={screenMesh}>
-        <planeGeometry
-          // args={[size.width, size.height]}
-          args={[viewport.width, viewport.height]}
-        />
+        <planeGeometry args={[viewport.width, viewport.height]} />
         <transitionMaterial
+          uDisplacement={rippleTexture.current}
           uTexture1={renderTarget1.texture}
           uTexture2={renderTarget2.texture}
-          // uProgress={0}
           {...transitionControls}
           toneMapped={false}
         />
-        {/* <meshBasicMaterial map={mainBuffer.texture} /> */}
       </mesh>
 
       {/* MAIN SCENE */}
