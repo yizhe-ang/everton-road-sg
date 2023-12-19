@@ -67,7 +67,7 @@ const splatProps = [
 ];
 
 export const Experience = () => {
-  const { pointer, scene } = useThree();
+  const { pointer, scene, size } = useThree();
   const scrollData = useScroll();
 
   // REFS
@@ -78,16 +78,16 @@ export const Experience = () => {
   });
   const splats = useRef([]);
   const transmissionMesh = useRef();
-  const text = useRef();
+  const text = useRef()
+
   const mainScene = useRef();
+  const mainCamera = useRef()
 
-  const buffer = useFBO();
+  const transmissionTexture = useFBO();
 
-  // const rippleTexture = useRef();
-  const rippleRenderTarget = useFBO();
-  const rippleScene = new THREE.Scene();
-  const rippleCamera = useRef();
   const rippleTexture = useRef();
+
+  const screenMesh = useRef()
 
   // LIGHT HELPERS
   const spotLight1 = useRef();
@@ -101,8 +101,8 @@ export const Experience = () => {
   // const renderedScene = new THREE.Scene();
   // const renderedScene = useRef();
 
-  // const renderTarget1 = useFBO();
-  // const renderTarget2 = useFBO();
+  const renderTarget1 = useFBO();
+  const renderTarget2 = useFBO();
   // const renderMaterial = useRef();
   // const renderCamera = useRef();
   // const screenCamera = useRef()
@@ -194,6 +194,14 @@ export const Experience = () => {
   //   // },
   // });
 
+  const transitionControls = useControls("Transition", {
+    uProgress: {
+      value: 0,
+      min: 0,
+      max: 1,
+    },
+  });
+
   const animateProps = useRef({
     thickness: 0.24,
   });
@@ -201,6 +209,7 @@ export const Experience = () => {
   // INIT
   useEffect(() => {
     // INIT CAMERA
+    cameraControls.current.camera = mainCamera.current;
     cameraControls.current.setLookAt(...cameraPositions.intro, false);
 
     // FIXME: useMemo makes it slow for some reason
@@ -331,21 +340,31 @@ export const Experience = () => {
     transmissionMesh.current.material.uniforms.thickness.value =
       animateProps.current.thickness;
 
-    // Capture ripple texture
-    // gl.setRenderTarget(rippleRenderTarget);
-    // gl.render(rippleScene, rippleCamera.current);
-
     // Only render splat in transmission mesh
+    screenMesh.current.visible = false
     splats.current[0].visible = true;
-    transmissionMesh.current.visible = false;
-    text.current.visible = false;
-    gl.setRenderTarget(buffer);
-    gl.render(scene, camera);
+    splats.current[1].visible = false;
+    mainScene.current.visible = false;
+    gl.setRenderTarget(transmissionTexture);
+    gl.render(scene, mainCamera.current);
 
-    gl.setRenderTarget(null);
+    // Capture 1st scene
     splats.current[0].visible = false;
-    transmissionMesh.current.visible = true;
-    text.current.visible = true;
+    mainScene.current.visible = true;
+    gl.setRenderTarget(renderTarget1)
+    gl.render(scene, mainCamera.current);
+
+    // Capture 2nd scene
+    splats.current[0].visible = false;
+    mainScene.current.visible = false;
+    splats.current[1].visible = true;
+    gl.setRenderTarget(renderTarget2)
+    gl.render(scene, mainCamera.current);
+
+    // Render to screen
+    screenMesh.current.visible = true
+    splats.current[1].visible = false;
+    gl.setRenderTarget(null);
   });
 
   return (
@@ -354,16 +373,10 @@ export const Experience = () => {
 
       {/* FIXME: Can we just use RenderTexture for this? */}
       {/* RIPPLE TEXTURE */}
-      {/* <OrthographicCamera ref={rippleCamera} position={[0, 0, 10]} />
-      {createPortal(<RippleTexture />, rippleScene)} */}
-
       <RenderTexture ref={rippleTexture}>
         <OrthographicCamera makeDefault position={[0, 0, 10]} />
         <RippleTexture pointer={pointer} />
       </RenderTexture>
-
-      {/* <OrthographicCamera ref={rippleCamera} position={[0, 0, 10]} />
-      <RippleTexture /> */}
 
       {/* POSTPROCESSING */}
       <EffectComposer disableNormalPass multisampling={0}>
@@ -378,7 +391,41 @@ export const Experience = () => {
         <ToneMapping />
       </EffectComposer>
 
+      {/* CONTROLS */}
+      <PerspectiveCamera ref={mainCamera} />
+      {/* FIXME: Which camera is this controlling? */}
+      <CameraControls
+        ref={cameraControls}
+        mouseButtons={{
+          left: 0,
+          middle: 0,
+          right: 0,
+          wheel: 0,
+        }}
+        touches={{
+          one: 0,
+          two: 0,
+          three: 0,
+        }}
+      />
+
       {/* SCREEN */}
+      <OrthographicCamera
+        makeDefault
+      />
+      {/* <PerspectiveCamera
+        makeDefault
+        position={[0, 0, 10]}
+      /> */}
+      <mesh ref={screenMesh}>
+        <planeGeometry args={[size.width, size.height]} />
+        <transitionMaterial
+          uTexture1={renderTarget1.texture}
+          uTexture2={renderTarget2.texture}
+          {...transitionControls}
+          toneMapped={false}
+        />
+      </mesh>
       {/* <mesh position-z={-5}>
         <planeGeometry args={[viewport.width, viewport.height]} />
         <transitionMaterial
@@ -389,27 +436,6 @@ export const Experience = () => {
         />
       </mesh> */}
 
-      {/* CONTROLS */}
-      <CameraControls
-        ref={cameraControls}
-        // enablePan={false}
-        disable
-        all
-        mouse
-        buttons
-        mouseButtons={{
-          left: 0,
-          middle: 0,
-          right: 0,
-          wheel: 0,
-        }}
-        // disable all touch gestures
-        touches={{
-          one: 0,
-          two: 0,
-          three: 0,
-        }}
-      />
 
       {/* SCENE */}
       <group ref={mainScene}>
@@ -459,7 +485,7 @@ export const Experience = () => {
         >
           {/* TODO: Low samples and low resolution to make it faster */}
           <MeshTransmissionMaterial
-            buffer={buffer.texture}
+            buffer={transmissionTexture.texture}
             // buffer={rippleRenderTarget.texture}
             backsideResolution={128}
             backsideThickness={-0.25}
