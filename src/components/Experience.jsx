@@ -38,8 +38,8 @@ import Displacement from "./Displacement";
 import { RippleTexture } from "./RippleTexture";
 
 // FIXME: useMemo?
-// const cameraRotate = new THREE.Vector2();
-// const cameraRotateBy = new THREE.Vector2();
+const cameraRotate = new THREE.Vector2();
+const cameraRotateBy = new THREE.Vector2();
 
 function disableMSAA(target) {
   // disable MSAA on render targets (in this case the transmission render target)
@@ -72,8 +72,12 @@ const cameraPositions = {
     13.183015351089564, 5.642161597038238, -1.4792102528298048,
   ],
   third: [
-    15.098788347310514, 6.3082217978470965, -1.4444576751603997,
+    15.098788347310514, 6.3082217978470965, -0.4444576751603997,
     15.098788575511467, 6.308221449416248, -1.4444613428454642,
+  ],
+  fourth: [
+    -7.633544592239733, 5.550605045436712, -1.3419344591902385,
+    -7.633544489691525, 5.550604942888504, -1.4444829746514958,
   ],
 };
 
@@ -84,9 +88,9 @@ const splatProps = [
   {
     source: "https://lumalabs.ai/capture/419f25df-ec39-45c3-8e87-7eee6dbc24da",
   },
-  // {
-  //   source: "https://lumalabs.ai/capture/b8eec778-d960-48d3-8d5f-be5d57173827",
-  // },
+  {
+    source: "https://lumalabs.ai/capture/b8eec778-d960-48d3-8d5f-be5d57173827",
+  },
 ];
 
 export const Experience = () => {
@@ -192,6 +196,20 @@ export const Experience = () => {
     },
   });
 
+  const splat3Controls = useControls("Splat 3", {
+    position: {
+      value: { x: 3.6, y: 4.7, z: -12.9 },
+      step: 0.1,
+    },
+    rotation: {
+      value: { x: 0.05, y: -6.35, z: 0.05 },
+      step: 0.05,
+    },
+    scale: {
+      value: 5,
+    },
+  });
+
   const shadowsControls = useControls("Shadows", {
     color: "black",
     opacity: { value: 0.7, min: 0, max: 1 },
@@ -243,6 +261,7 @@ export const Experience = () => {
 
   const animateProps = useRef({
     thickness: 0.24,
+    sceneI: 0,
   });
 
   useEffect(() => {
@@ -346,12 +365,7 @@ export const Experience = () => {
       .to(cameraData.current.position, {
         endArray: cameraPositions.second,
         duration: 1,
-        onUpdate: () => {
-          cameraControls.current.setLookAt(
-            ...cameraData.current.position,
-            false
-          );
-        },
+        onUpdate: updateCamera,
       })
       // Transition to second splat
       .to(screenMesh.current.material.uniforms.uProgress, {
@@ -362,14 +376,56 @@ export const Experience = () => {
       .to(cameraData.current.position, {
         endArray: cameraPositions.third,
         duration: 1,
-        onUpdate: () => {
-          cameraControls.current.setLookAt(
-            ...cameraData.current.position,
-            false
-          );
+        onUpdate: updateCamera,
+      })
+      // Update scene index
+      .to(
+        animateProps.current,
+        {
+          sceneI: 1,
+          duration: 1,
         },
+        "<"
+      )
+      .to(
+        screenMesh.current.material.uniforms.uProgress,
+        {
+          value: 1,
+          duration: 1,
+        },
+        "<"
+      )
+      // Transition to third splat
+      .fromTo(
+        screenMesh.current.material.uniforms.uProgress,
+        {
+          value: 0,
+        },
+        {
+          value: 1,
+          duration: 1,
+        }
+      )
+      // Pan over third splat
+      .to(cameraData.current.position, {
+        endArray: cameraPositions.fourth,
+        duration: 1,
+        onUpdate: updateCamera,
       });
   }, []);
+
+  function updateCamera() {
+    // FIXME: Just lerp this too?
+    // cameraControls.current.setLookAt(...cameraData.current.position, false);
+
+    cameraControls.current.lerpLookAt(
+      ...cameraControls.current.getPosition(),
+      ...cameraControls.current.getTarget(),
+      ...cameraData.current.position,
+      0.1,
+      false
+    );
+  }
 
   // UPDATE SPLATS
   useEffect(() => {
@@ -400,9 +456,25 @@ export const Experience = () => {
     );
   }, [splat2Controls]);
 
+  useEffect(() => {
+    splats.current[2].position.set(
+      splat3Controls.position.x,
+      splat3Controls.position.y,
+      splat3Controls.position.z
+    );
+    splats.current[2].scale.setScalar(splat3Controls.scale);
+    splats.current[2].rotation.set(
+      splat3Controls.rotation.x,
+      splat3Controls.rotation.y,
+      splat3Controls.rotation.z
+    );
+  }, [splat3Controls]);
+
   useFrame(({ scene, gl, clock }, delta) => {
+    console.log(screenMesh.current.material.uniforms.uProgress.value);
+
     // Update time
-    screenMesh.current.material.uniforms.uTime = clock.getElapsedTime();
+    screenMesh.current.material.uniforms.uTime.value = clock.getElapsedTime();
 
     // Make text always look at camera
     text.current.lookAt(renderCamera.current.position);
@@ -413,24 +485,24 @@ export const Experience = () => {
       animateProps.current.thickness;
 
     // ROTATE CAMERA ON MOUSE MOVE
-    cameraGroup.current.rotation.y = THREE.MathUtils.lerp(
-      cameraGroup.current.rotation.y,
-      (pointer.x * Math.PI) / 10,
-      0.05
-    );
-    cameraGroup.current.rotation.x = THREE.MathUtils.lerp(
-      cameraGroup.current.rotation.x,
-      (pointer.y * Math.PI) / 10,
-      0.05
-    );
-
-    // cameraRotateBy.set(pointer.x * 0.007, pointer.y * 0.007);
-    // cameraRotate.lerp(cameraRotateBy, delta * 2);
-    // cameraControls.current.rotate(
-    //   cameraRotateBy.x - cameraRotate.x,
-    //   cameraRotateBy.y - cameraRotate.y,
-    //   false
+    // cameraGroup.current.rotation.y = THREE.MathUtils.lerp(
+    //   cameraGroup.current.rotation.y,
+    //   (pointer.x * Math.PI) / 10,
+    //   0.05
     // );
+    // cameraGroup.current.rotation.x = THREE.MathUtils.lerp(
+    //   cameraGroup.current.rotation.x,
+    //   (pointer.y * Math.PI) / 10,
+    //   0.05
+    // );
+
+    cameraRotateBy.set(pointer.x * 0.007, pointer.y * 0.007);
+    cameraRotate.lerp(cameraRotateBy, delta * 2);
+    cameraControls.current.rotate(
+      cameraRotateBy.x - cameraRotate.x,
+      cameraRotateBy.y - cameraRotate.y,
+      false
+    );
 
     // UPDATE SCROLL ANIMATIONS
     if (tl.current) {
@@ -439,35 +511,22 @@ export const Experience = () => {
 
     screenMesh.current.visible = false;
 
-    // Capture transmission texture
-    gl.setRenderTarget(transmissionBuffer);
-
-    splats.current[0].visible = true;
-    splats.current[1].visible = false;
-    mainGroup.current.visible = false;
-
-    gl.render(scene, renderCamera.current);
-
     // Render first scene
+    setupRenderTarget1(animateProps.current.sceneI, gl);
+
     gl.setRenderTarget(renderTarget1);
-
-    splats.current[0].visible = false;
-    splats.current[1].visible = false;
-    mainGroup.current.visible = true;
-
     gl.render(scene, renderCamera.current);
 
     // Render second scene
+    setupRenderTarget2(animateProps.current.sceneI, gl);
+
     gl.setRenderTarget(renderTarget2);
-
-    splats.current[0].visible = false;
-    splats.current[1].visible = true;
-    mainGroup.current.visible = false;
-
     gl.render(scene, renderCamera.current);
 
+    // Render to screen
     splats.current[0].visible = false;
     splats.current[1].visible = false;
+    splats.current[2].visible = false;
     mainGroup.current.visible = false;
 
     screenMesh.current.visible = true;
@@ -475,6 +534,44 @@ export const Experience = () => {
     gl.setRenderTarget(null);
     screenMesh.current.material.map = renderTarget1.texture;
   });
+
+  function setupRenderTarget1(i, gl) {
+    if (i < 1) {
+      // Capture transmission texture
+      gl.setRenderTarget(transmissionBuffer);
+
+      splats.current[0].visible = true;
+      splats.current[1].visible = false;
+      splats.current[2].visible = false;
+      mainGroup.current.visible = false;
+
+      gl.render(scene, renderCamera.current);
+
+      splats.current[0].visible = false;
+      splats.current[1].visible = false;
+      splats.current[2].visible = false;
+      mainGroup.current.visible = true;
+    } else {
+      splats.current[0].visible = false;
+      splats.current[1].visible = true;
+      splats.current[2].visible = false;
+      mainGroup.current.visible = false;
+    }
+  }
+
+  function setupRenderTarget2(i, gl) {
+    if (i < 1) {
+      splats.current[0].visible = false;
+      splats.current[1].visible = true;
+      splats.current[2].visible = false;
+      mainGroup.current.visible = false;
+    } else {
+      splats.current[0].visible = false;
+      splats.current[1].visible = false;
+      splats.current[2].visible = true;
+      mainGroup.current.visible = false;
+    }
+  }
 
   return (
     <>
@@ -497,7 +594,7 @@ export const Experience = () => {
       </mesh>
 
       {/* MAIN SCENE */}
-      {/* FIXME: Use a group to perform rotation independently on mouse move? */}
+      {/* FIXME: Doesn't work as expected as position of camera moves */}
       <group ref={cameraGroup}>
         <PerspectiveCamera near={0.5} ref={renderCamera} />
       </group>

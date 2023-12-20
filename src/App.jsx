@@ -20,7 +20,7 @@ function App() {
       >
         <Perf position="top-left" />
         {/* FIXME: Just use ScrollTrigger? */}
-        <ScrollControls pages={5}>
+        <ScrollControls pages={15}>
           {/* FIXME: Need fog? */}
           {/* <fog attach="fog" args={["white", 27.5, 75]} /> */}
           <Experience />
