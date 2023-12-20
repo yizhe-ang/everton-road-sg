@@ -16,6 +16,11 @@ import {
   OrthographicCamera,
   useTexture,
   RenderTexture,
+  Lightformer,
+  AccumulativeShadows,
+  RandomizedLight,
+  GradientTexture,
+  GradientType,
 } from "@react-three/drei";
 import { LumaSplatsThree } from "@lumaai/luma-web";
 import { createPortal, extend, useFrame, useThree } from "@react-three/fiber";
@@ -97,6 +102,9 @@ export const Experience = () => {
   const { pointer, scene, size, viewport } = useThree();
   const scrollData = useScroll();
 
+  // const bg = useTexture("textures/gggrain-1.svg")
+  // const bg = useTexture("textures/grey-gradient2.png")
+
   // REFS
   const cameraControls = useRef();
   const tl = useRef();
@@ -124,6 +132,8 @@ export const Experience = () => {
   const screenMesh = useRef();
 
   const mainSceneTexture = useRef();
+
+  const contactShadows = useRef();
 
   // LIGHT HELPERS
   const spotLight1 = useRef();
@@ -210,11 +220,11 @@ export const Experience = () => {
     },
   });
 
-  const shadowsControls = useControls("Shadows", {
-    color: "black",
-    opacity: { value: 0.7, min: 0, max: 1 },
-    blur: { value: 2.5, min: 0, max: 10 },
-  });
+  // const shadowsControls = useControls("Shadows", {
+  //   color: "black",
+  //   opacity: { value: 0.7, min: 0, max: 1 },
+  //   blur: { value: 2.5, min: 0, max: 10 },
+  // });
 
   const skyControls = useControls("Sky", {
     sunPosition: { value: [1, 2, 3] },
@@ -222,6 +232,10 @@ export const Experience = () => {
 
   const envControls = useControls("Environment", {
     envMapIntensity: { value: 0.25, min: 0, max: 12 },
+  });
+
+  const { blur } = useControls("Env Blur", {
+    blur: { value: 0.4, min: 0, max: 1 },
   });
 
   // const transitionControls = useControls("Transition", {
@@ -255,6 +269,11 @@ export const Experience = () => {
     },
   });
 
+  const shadowsControls = useControls("Shadows", {
+    // color: "#BBBBFF",
+    color: "#31314e",
+  });
+
   const cameraData = useRef({
     position: cameraPositions.intro,
   });
@@ -265,6 +284,9 @@ export const Experience = () => {
   });
 
   useEffect(() => {
+    // INIT BACKGROUND
+    // scene.background = bg
+
     // INIT CAMERA
     cameraControls.current.camera = renderCamera.current;
     cameraControls.current.setLookAt(...cameraPositions.intro, false);
@@ -358,6 +380,24 @@ export const Experience = () => {
           x: -5,
           y: 5.2,
           z: -15.6,
+        },
+        "<"
+      )
+      // Turn up displacement
+      .to(
+        screenMesh.current.material.uniforms.uDisplacementStrength,
+        {
+          value: 1,
+          duration: 1,
+        },
+        "<"
+      )
+      // Turn off spotlight
+      .to(
+        spotLight3.current,
+        {
+          intensity: 0,
+          duration: 1,
         },
         "<"
       )
@@ -471,8 +511,6 @@ export const Experience = () => {
   }, [splat3Controls]);
 
   useFrame(({ scene, gl, clock }, delta) => {
-    console.log(screenMesh.current.material.uniforms.uProgress.value);
-
     // Update time
     screenMesh.current.material.uniforms.uTime.value = clock.getElapsedTime();
 
@@ -593,11 +631,7 @@ export const Experience = () => {
         </transitionMaterial>
       </mesh>
 
-      {/* MAIN SCENE */}
-      {/* FIXME: Doesn't work as expected as position of camera moves */}
-      <group ref={cameraGroup}>
-        <PerspectiveCamera near={0.5} ref={renderCamera} />
-      </group>
+      <PerspectiveCamera near={0.5} ref={renderCamera} />
       <CameraControls
         ref={cameraControls}
         mouseButtons={{
@@ -613,6 +647,7 @@ export const Experience = () => {
         }}
       />
 
+      {/* MAIN SCENE */}
       <group ref={mainGroup}>
         {/* LIGHTING */}
         <ambientLight intensity={Math.PI / 4} />
@@ -635,16 +670,16 @@ export const Experience = () => {
           penumbra={1}
           intensity={2000}
         />
-        {/* <spotLight
-        ref={spotLight3}
-        color="red"
-        position={[15, 0, 20]}
-        angle={0.1}
-        decay={1}
-        distance={35}
-        penumbra={-1}
-        intensity={100}
-      /> */}
+        <spotLight
+          ref={spotLight3}
+          color="red"
+          position={[15, 0, 20]}
+          angle={0.1}
+          decay={1}
+          distance={35}
+          penumbra={-1}
+          intensity={100}
+        />
 
         {/* TRANSMISSION MESH */}
         {/* <Float> */}
@@ -675,28 +710,102 @@ export const Experience = () => {
           </MeshTransmissionMaterial>
         </RoundedBox>
 
+        {/* FAKE SHADOW */}
+        {/* FIXME: Really looks cmi */}
+        <mesh scale={150} rotation-x={-Math.PI / 2} position-y={-10}>
+          <planeGeometry />
+          <meshBasicMaterial color={shadowsControls.color} transparent>
+            <GradientTexture
+              attach="alphaMap"
+              stops={[0, 0.8, 1]} // As many stops as you want
+              colors={["white", "black", "black"]} // Colors need to match the number of stops
+              size={1024} // Size (height) is optional, default = 1024
+              width={1024} // Width of the canvas producing the texture, default = 16
+              type={GradientType.Radial} // The type of the gradient, default = GradientType.Linear
+              innerCircleRadius={0} // Optional, the radius of the inner circle of the gradient, default = 0
+              outerCircleRadius={"auto"} // Optional, the radius of the outer circle of the gradient, default = auto
+            />
+          </meshBasicMaterial>
+        </mesh>
+
         {/* FIXME: ContactShadows is gone */}
-        <ContactShadows
+        {/* FIXME: How to render / init this again? */}
+        {/* https://threejs.org/examples/#webgl_shadow_contact */}
+        {/* May require a custom solution */}
+        {/* <ContactShadows
+          ref={contactShadows}
           frames={1}
           position={[0, -10, 0]}
           scale={50}
           far={40}
           {...shadowsControls}
-        />
+        /> */}
 
         {/* ENVIRONMENT */}
-        {/* <Sky {...skyControls} /> */}
         <Environment
-          files="./environmentMaps/the_sky_is_on_fire_2k.hdr"
-          // preset="sunset"
+          // files="./environmentMaps/the_sky_is_on_fire_2k.hdr"
+          preset="dawn"
           background
           // ground={{
           //   height: 7,
           //   radius: 28,
           //   scale: 100
           // }}
-          blur={1}
+          blur={blur}
         ></Environment>
+        {/* <Environment preset="city" resolution={256} background blur={0.8}>
+          <Lightformer
+            intensity={4}
+            rotation-x={Math.PI / 2}
+            position={[0, 5, -9]}
+            scale={[10, 10, 1]}
+          />
+          <Lightformer
+            intensity={4}
+            rotation-x={Math.PI / 2}
+            position={[0, 5, -9]}
+            scale={[10, 10, 1]}
+          />
+          <group rotation={[Math.PI / 2, 1, 0]}>
+            {[2, -2, 2, -4, 2, -5, 2, -9].map((x, i) => (
+              <Lightformer
+                key={i}
+                intensity={1}
+                rotation={[Math.PI / 4, 0, 0]}
+                position={[x, 4, i * 4]}
+                scale={[4, 1, 1]}
+              />
+            ))}
+            <Lightformer
+              intensity={0.5}
+              rotation-y={Math.PI / 2}
+              position={[-5, 1, -1]}
+              scale={[50, 2, 1]}
+            />
+            <Lightformer
+              intensity={0.5}
+              rotation-y={Math.PI / 2}
+              position={[-5, -1, -1]}
+              scale={[50, 2, 1]}
+            />
+            <Lightformer
+              intensity={0.5}
+              rotation-y={-Math.PI / 2}
+              position={[10, 1, 0]}
+              scale={[50, 2, 1]}
+            />
+          </group>
+          <Lightformer
+            intensity={5}
+            form="ring"
+            // color={new THREE.Color(0.2, 0, 0)}
+            color="red"
+            rotation-y={Math.PI / 2}
+            position={[-5, 2, -1]}
+            // scale={[10, 10, 1]}
+            scale={[3, 3, 1]}
+          />
+        </Environment> */}
 
         {/* TEXT */}
         {/* TODO: Explore some cool typography effects */}

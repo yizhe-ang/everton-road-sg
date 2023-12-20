@@ -5,6 +5,7 @@ export const TransitionMaterial = shaderMaterial(
     uProgress: 0,
     uTime: 0,
     uDisplacement: undefined,
+    uDisplacementStrength: 0,
     uTexture1: undefined,
     uTexture2: undefined,
   },
@@ -19,6 +20,7 @@ export const TransitionMaterial = shaderMaterial(
 
     varying vec2 vUv;
     uniform sampler2D uDisplacement;
+    uniform float uDisplacementStrength;
     uniform sampler2D uTexture1;
     uniform sampler2D uTexture2;
     uniform float uProgress;
@@ -42,7 +44,7 @@ export const TransitionMaterial = shaderMaterial(
       float theta = displacement.r * 2. * PI;
       vec2 dir = vec2(sin(theta), cos(theta));
 
-      uv += dir * displacement.r * 0.1;
+      uv += dir * displacement.r * 0.1 * uDisplacementStrength;
 
       // Extract scene textures
       vec4 tex1 = texture2D(uTexture1, uv);

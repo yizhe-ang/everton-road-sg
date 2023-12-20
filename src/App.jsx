@@ -13,12 +13,10 @@ extend({
 function App() {
   return (
     <>
-      <Leva collapsed />
-      <Canvas
-        gl={{ antialias: false }}
-        // orthographic camera={{ position: [0, 0, 5], fov: 30 }}
-      >
-        <Perf position="top-left" />
+      <Leva collapsed hidden />
+      <Canvas gl={{ antialias: false }}>
+        {/* <Perf position="top-left" /> */}
+        {/* <color attach="background" args={["#f0f0f0"]} /> */}
         {/* FIXME: Just use ScrollTrigger? */}
         <ScrollControls pages={15}>
           {/* FIXME: Need fog? */}
