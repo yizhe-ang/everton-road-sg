@@ -1,4 +1,3 @@
-// FIXME: Why does the scene disappear on resize?
 import {
   MeshTransmissionMaterial,
   RoundedBox,
@@ -812,21 +811,24 @@ export const Experience = () => {
         <group position-y={20} ref={text}>
           <Text
             fontSize={5}
+            color={"#5eead4"}
             anchorY="bottom"
             textAlign="center"
             font="fonts/Gloock-Regular.ttf"
           >
             Everton Road
-            <meshStandardMaterial color="white" />
+            <meshStandardMaterial />
           </Text>
           <Text
             fontSize={2}
+            color="#c2410c"
             anchorY="top"
             textAlign="center"
             font="fonts/Agbalumo-Regular.ttf"
+            position={[8, 0.5, 0]}
           >
             Singapore
-            <meshStandardMaterial color="grey" />
+            <meshStandardMaterial />
           </Text>
         </group>
       </group>
