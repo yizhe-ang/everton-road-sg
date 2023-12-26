@@ -13,14 +13,10 @@ extend({
 function App() {
   return (
     <>
-      <Leva collapsed hidden />
+      <Leva collapsed hidden={true} />
       <Canvas gl={{ antialias: false }}>
         {/* <Perf position="top-left" /> */}
-        {/* <color attach="background" args={["#f0f0f0"]} /> */}
-        {/* FIXME: Just use ScrollTrigger? */}
         <ScrollControls pages={15}>
-          {/* FIXME: Need fog? */}
-          {/* <fog attach="fog" args={["white", 27.5, 75]} /> */}
           <Experience />
         </ScrollControls>
       </Canvas>

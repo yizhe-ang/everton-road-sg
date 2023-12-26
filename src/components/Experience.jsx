@@ -1,44 +1,25 @@
 import {
   MeshTransmissionMaterial,
   RoundedBox,
-  ContactShadows,
   Environment,
-  Float,
   CameraControls,
   PerspectiveCamera,
-  useHelper,
-  Sky,
   Text,
-  Billboard,
   useScroll,
   useFBO,
   OrthographicCamera,
-  useTexture,
   RenderTexture,
-  Lightformer,
-  AccumulativeShadows,
-  RandomizedLight,
   GradientTexture,
   GradientType,
 } from "@react-three/drei";
 import { LumaSplatsThree } from "@lumaai/luma-web";
-import { createPortal, extend, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
+import { useEffect, useRef } from "react";
 import { button, useControls } from "leva";
-import { Perf } from "r3f-perf";
 import * as THREE from "three";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 gsap.registerPlugin(ScrollTrigger);
-import { MathUtils } from "three";
-import {
-  DepthOfField,
-  EffectComposer,
-  Noise,
-  ToneMapping,
-  Vignette,
-} from "@react-three/postprocessing";
-import Displacement from "./Displacement";
 import { RippleTexture } from "./RippleTexture";
 
 // FIXME: useMemo?
@@ -54,19 +35,10 @@ function disableMSAA(target) {
 }
 
 const cameraPositions = {
-  // intro: [21.707168377678304, 13.893007782474893, 30.59057331563459, 0, 0, 0],
-  // intro: [
-  //   20.06849559824884, 20.591704884512403, 28.711102001421885,
-  //   -1.6386727794294618, 6.698697102037511, -1.8794713142127077,
-  // ],
   intro: [
     31.0814054001045, 27.640180250935998, 44.23091641713191,
     -1.6386727794294618, 6.698697102037511, -1.8794713142127077,
   ],
-  // intro: {
-  //   position: [31.0814054001045, 27.640180250935998, 44.23091641713191],
-  //   rotation: [0.6171420227625866, 1.2160791165053084],
-  // },
   first: [
     0.03290476337967078, 5.076205399137682, 18.35918306555744,
     0.059181256326662754, 4.79112616756302, -1.858920041560228,
@@ -98,23 +70,15 @@ const splatProps = [
 ];
 
 export const Experience = () => {
-  const { pointer, scene, size, viewport } = useThree();
+  const { pointer, scene, viewport } = useThree();
   const scrollData = useScroll();
-
-  // const bg = useTexture("textures/gggrain-1.svg")
-  // const bg = useTexture("textures/grey-gradient2.png")
 
   // REFS
   const cameraControls = useRef();
   const tl = useRef();
-  // const cameraData = useRef({
-  //   position: cameraPositions.intro,
-  // });
   const splats = useRef([]);
   const transmissionMesh = useRef();
   const text = useRef();
-
-  const mainScene = new THREE.Scene();
 
   const renderTarget1 = useFBO();
   const renderTarget2 = useFBO();
@@ -124,15 +88,10 @@ export const Experience = () => {
   const mainGroup = useRef();
 
   const renderCamera = useRef();
-  const cameraGroup = useRef();
 
   const rippleTexture = useRef();
 
   const screenMesh = useRef();
-
-  const mainSceneTexture = useRef();
-
-  const contactShadows = useRef();
 
   // LIGHT HELPERS
   const spotLight1 = useRef();
@@ -141,14 +100,6 @@ export const Experience = () => {
   // useHelper(spotLight1, THREE.SpotLightHelper)
   // useHelper(spotLight2, THREE.SpotLightHelper)
   // useHelper(spotLight3, THREE.SpotLightHelper)
-
-  // SETUP FBOS
-  // const renderedScene = new THREE.Scene();
-  // const renderedScene = useRef();
-
-  // const renderMaterial = useRef();
-  // const renderCamera = useRef();
-  // const screenCamera = useRef()
 
   // CONTROLS
   useControls("Camera", {
@@ -162,14 +113,14 @@ export const Experience = () => {
   const transmissionControls = useControls("Transmission", {
     transmissionSampler: false,
     backside: false,
-    samples: { value: 10, min: 1, max: 32, step: 1 },
+    samples: { value: 4, min: 1, max: 32, step: 1 },
     resolution: { value: 1024, min: 256, max: 2048, step: 256 },
     transmission: { value: 1, min: 0, max: 1 },
     roughness: { value: 0.0, min: 0, max: 1, step: 0.01 },
     thickness: { value: 0.24, min: 0, max: 10, step: 0.01 },
     ior: { value: 5, min: 1, max: 5, step: 0.01 },
     chromaticAberration: { value: 0.1, min: 0, max: 1 },
-    anisotropy: { value: 0.07, min: 0, max: 1, step: 0.01 },
+    anisotropy: { value: 0.1, min: 0, max: 1, step: 0.01 },
     distortion: { value: 0.04, min: 0, max: 1, step: 0.01 },
     distortionScale: { value: 0.36, min: 0.01, max: 1, step: 0.01 },
     temporalDistortion: { value: 0.6, min: 0, max: 1, step: 0.01 },
@@ -454,9 +405,6 @@ export const Experience = () => {
   }, []);
 
   function updateCamera() {
-    // FIXME: Just lerp this too?
-    // cameraControls.current.setLookAt(...cameraData.current.position, false);
-
     cameraControls.current.lerpLookAt(
       ...cameraControls.current.getPosition(),
       ...cameraControls.current.getTarget(),
@@ -515,7 +463,6 @@ export const Experience = () => {
 
     // Make text always look at camera
     text.current.lookAt(renderCamera.current.position);
-    // text.current.lookAt(cameraGroup.current.position);
 
     // FIXME: Why does it keep getting reset?
     transmissionMesh.current.material.uniforms.thickness.value =
@@ -682,9 +629,6 @@ export const Experience = () => {
 
         {/* TRANSMISSION MESH */}
         {/* <Float> */}
-        {/* TODO: Use MeshPortalMaterial? */}
-        {/* FIXME: Can't do transition effects with transmission material? */}
-        {/* TODO: Can use a different model? Like a toy box */}
         <RoundedBox
           ref={transmissionMesh}
           args={[1.15, 1, 1]}
@@ -699,6 +643,9 @@ export const Experience = () => {
             backsideThickness={-0.25}
             backsideRoughness={0.3}
             clearcoatRoughness={0.1}
+            iridescence={1}
+            iridescenceIOR={1}
+            iridescenceThicknessRange={[0, 1400]}
             // thickness={0.24}
             {...transmissionControls}
             {...envControls}
@@ -741,73 +688,9 @@ export const Experience = () => {
         /> */}
 
         {/* ENVIRONMENT */}
-        <Environment
-          // files="./environmentMaps/the_sky_is_on_fire_2k.hdr"
-          preset="dawn"
-          background
-          // ground={{
-          //   height: 7,
-          //   radius: 28,
-          //   scale: 100
-          // }}
-          blur={blur}
-        ></Environment>
-        {/* <Environment preset="city" resolution={256} background blur={0.8}>
-          <Lightformer
-            intensity={4}
-            rotation-x={Math.PI / 2}
-            position={[0, 5, -9]}
-            scale={[10, 10, 1]}
-          />
-          <Lightformer
-            intensity={4}
-            rotation-x={Math.PI / 2}
-            position={[0, 5, -9]}
-            scale={[10, 10, 1]}
-          />
-          <group rotation={[Math.PI / 2, 1, 0]}>
-            {[2, -2, 2, -4, 2, -5, 2, -9].map((x, i) => (
-              <Lightformer
-                key={i}
-                intensity={1}
-                rotation={[Math.PI / 4, 0, 0]}
-                position={[x, 4, i * 4]}
-                scale={[4, 1, 1]}
-              />
-            ))}
-            <Lightformer
-              intensity={0.5}
-              rotation-y={Math.PI / 2}
-              position={[-5, 1, -1]}
-              scale={[50, 2, 1]}
-            />
-            <Lightformer
-              intensity={0.5}
-              rotation-y={Math.PI / 2}
-              position={[-5, -1, -1]}
-              scale={[50, 2, 1]}
-            />
-            <Lightformer
-              intensity={0.5}
-              rotation-y={-Math.PI / 2}
-              position={[10, 1, 0]}
-              scale={[50, 2, 1]}
-            />
-          </group>
-          <Lightformer
-            intensity={5}
-            form="ring"
-            // color={new THREE.Color(0.2, 0, 0)}
-            color="red"
-            rotation-y={Math.PI / 2}
-            position={[-5, 2, -1]}
-            // scale={[10, 10, 1]}
-            scale={[3, 3, 1]}
-          />
-        </Environment> */}
+        <Environment preset="dawn" background blur={blur}></Environment>
 
         {/* TEXT */}
-        {/* TODO: Explore some cool typography effects */}
         <group position-y={20} ref={text}>
           <Text
             fontSize={5}
